@@ -1,4 +1,4 @@
-"""公开样本的远程表情分析，不连接摄像头，也不向业务数据库写入。"""
+"""远程表情分析适配；原始图像仅在内存中处理。"""
 
 import base64
 import io
@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 from PIL import Image, ImageOps, UnidentifiedImageError
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from .pipeline import EMOTION_MAP
+from .pipeline import EMOTION_MAP, Prediction
 
 SERVICE_DIR = Path(__file__).resolve().parents[1]
 load_dotenv(SERVICE_DIR / ".env")
@@ -192,7 +192,6 @@ class DeepSeekVision:
             "model": MODEL,
             "confidenceKind": "self_reported",
             "calibrated": False,
-            "sampleOnly": True,
             "persisted": False,
             "elapsedMs": round((time.monotonic() - started) * 1000),
             "faces": [
@@ -206,4 +205,29 @@ def analyze_sample(image_id: str) -> dict:
     path = sample_path(image_id)
     if path.stat().st_size > MAX_BYTES:
         raise VisionError("样本超过大小限制", 422)
-    return {"imageId": image_id, **DeepSeekVision().analyze(path.read_bytes())}
+    return {
+        "imageId": image_id,
+        "sampleOnly": True,
+        **DeepSeekVision().analyze(path.read_bytes()),
+    }
+
+
+class DeepSeekCameraModel:
+    def __init__(self):
+        self.adapter = DeepSeekVision()
+        self.loaded = False
+        self.elapsed_ms = None
+
+    def predict(self, frame) -> list[Prediction]:
+        # OpenCV 返回 BGR 数组；编码仅发生在内存中。
+        image = Image.fromarray(frame[:, :, ::-1])
+        image.thumbnail((1024, 1024), Image.Resampling.LANCZOS)
+        output = io.BytesIO()
+        image.save(output, "JPEG", quality=85)
+        result = self.adapter.analyze(output.getvalue())
+        self.loaded = True
+        self.elapsed_ms = result["elapsedMs"]
+        return [
+            Prediction(face["label"], face["score"], "DeepSeek", "self_reported")
+            for face in result["faces"]
+        ]

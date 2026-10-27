@@ -1,5 +1,13 @@
 # API 协作草案
 
+## v0.4 摄像头 API 实验增量
+
+AI 启动模式新增 `camera-api`。该模式要求 `allowRemoteUpload: true`、`sampleIntervalSeconds >= 5`，并使用 `maxSamples`（默认 5，范围 1—60）和 `maxDurationSeconds`（默认 120，范围 10—600）限制实验。到达任一上限停止新采样；正在进行的设备读取或请求结束后退出。错误响应或无效 API 结果停止实验，不自动重试付费推理；结构化入库仍使用原有重试和幂等机制。
+
+AI 状态新增 `apiCalls`、`lastInferenceMs`、`lastInferenceAt`、`lastFaces: [{emotion, score}]` 与 `stopReason`（`REQUESTED`、`MAX_SAMPLES`、`TIME_LIMIT`、`ERROR`）。手动停止期间返回仍在运行时，表示正等待设备或上游调用结束；不会继续采样，当前调用返回结果不入库。状态不包含图像。
+
+AI 入库新增可选 `inferenceProvider`（`DeepSeek` 或 `DeepFace`）、`confidenceKind`（`self_reported` 或 `model_score`）。DeepSeek 必须配套 `self_reported`，否则返回 422。远程摄像头记录为 `source: AI`、`simulated: false`、匿名用户，`recordedAt` 取采样时刻，`deviceId` 为 `camera-api-{index}`。幂等载荷比较、历史查询与 CSV 保留新增字段；PostgreSQL 结构变更见 `003_inference_metadata.sql`。正式后端仍为占位，迁移与业务持久化须在正式环境验证。
+
 ## v0.3 图片分析增量
 
 以下接口已由独立联调服务和 AI 服务实现；正式后端尚未实现。既有 v0.2 业务契约保持有效。

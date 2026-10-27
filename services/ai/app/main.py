@@ -7,7 +7,7 @@ from uuid import UUID
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .runner import Runner
@@ -22,10 +22,21 @@ class ImageRequest(BaseModel):
 
 class Config(BaseModel):
     sessionId: UUID
-    mode: Literal["simulation", "camera"] = "simulation"
+    mode: Literal["simulation", "camera", "camera-api"] = "simulation"
     sampleIntervalSeconds: float = Field(default=2, ge=0.5, le=60)
     confidenceThreshold: float = Field(default=0.75, ge=0, le=1)
     cameraIndex: int = Field(default=0, ge=0, le=10)
+    allowRemoteUpload: bool = False
+    maxSamples: int = Field(default=5, ge=1, le=60)
+    maxDurationSeconds: int = Field(default=120, ge=10, le=600)
+
+    @model_validator(mode="after")
+    def remote_camera(self):
+        if self.mode == "camera-api" and (
+            not self.allowRemoteUpload or self.sampleIntervalSeconds < 5
+        ):
+            raise ValueError("远程摄像头需要明确允许发送，采样间隔至少 5 秒")
+        return self
 
 
 def create_app(outbox_path=None):

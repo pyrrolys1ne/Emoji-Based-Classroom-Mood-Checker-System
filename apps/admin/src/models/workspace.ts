@@ -28,7 +28,19 @@ export function csvCell(value: unknown) {
 
 export function exportRecords(data: WorkspaceData, records: EmojiRecord[]) {
   const rows = [
-    ['记录编号', '用户', '课程', '班级', '情绪', '来源', '置信度', '记录时间', '模拟输入'],
+    [
+      '记录编号',
+      '用户',
+      '课程',
+      '班级',
+      '情绪',
+      '来源',
+      '模型分数',
+      '记录时间',
+      '模拟输入',
+      '推理提供方',
+      '分数类型',
+    ],
     ...records.map((record) => {
       const session = data.sessions.find((item) => item.id === record.sessionId);
       return [
@@ -41,6 +53,8 @@ export function exportRecords(data: WorkspaceData, records: EmojiRecord[]) {
         record.confidence ?? '',
         record.recordedAt,
         record.simulated ? '是' : '否',
+        record.inferenceProvider ?? '',
+        record.confidenceKind ?? '',
       ];
     }),
   ];

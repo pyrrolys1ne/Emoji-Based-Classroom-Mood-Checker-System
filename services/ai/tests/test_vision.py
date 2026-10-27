@@ -5,7 +5,7 @@ import json
 import httpx
 import pytest
 from app.main import create_app
-from app.vision import DeepSeekVision, VisionError, prepare_image
+from app.vision import DeepSeekCameraModel, DeepSeekVision, VisionError, prepare_image
 from fastapi.testclient import TestClient
 from PIL import Image
 
@@ -185,3 +185,30 @@ def test_service_imports_in_flat_container_layout(tmp_path, monkeypatch):
         capture_output=True,
         timeout=15,
     )
+
+
+def test_camera_adapter_converts_bgr_in_memory_and_preserves_score_kind(monkeypatch):
+    marker = object()
+
+    class Frame:
+        def __getitem__(self, key):
+            assert key == (slice(None), slice(None), slice(None, None, -1))
+            return marker
+
+    def from_array(value):
+        assert value is marker
+        return Image.new("RGB", (640, 480), (128, 128, 128))
+
+    monkeypatch.setattr("app.vision.Image.fromarray", from_array)
+    model = DeepSeekCameraModel()
+
+    def analyze(content):
+        with Image.open(io.BytesIO(content)) as image:
+            assert image.format == "JPEG" and image.size == (640, 480)
+        return {"elapsedMs": 71, "faces": [{"label": "happy", "score": 0.9}]}
+
+    monkeypatch.setattr(model.adapter, "analyze", analyze)
+    predictions = model.predict(Frame())
+    assert model.loaded and model.elapsed_ms == 71
+    assert predictions[0].inference_provider == "DeepSeek"
+    assert predictions[0].confidence_kind == "self_reported"

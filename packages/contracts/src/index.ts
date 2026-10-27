@@ -40,6 +40,8 @@ export interface EmojiRecord {
   confidence: number | null;
   recordedAt: string;
   simulated?: boolean;
+  inferenceProvider?: 'DeepSeek' | 'DeepFace' | null;
+  confidenceKind?: 'self_reported' | 'model_score' | null;
 }
 export interface WorkspaceData {
   users: User[];
@@ -62,14 +64,17 @@ export interface AuthSession {
 }
 export interface AIConfig {
   sessionId: string;
-  mode: 'simulation' | 'camera';
+  mode: 'simulation' | 'camera' | 'camera-api';
   sampleIntervalSeconds: number;
   confidenceThreshold: number;
   cameraIndex: number;
+  allowRemoteUpload?: boolean;
+  maxSamples?: number;
+  maxDurationSeconds?: number;
 }
 export interface AIStatus {
   running: boolean;
-  mode: 'simulation' | 'camera' | null;
+  mode: 'simulation' | 'camera' | 'camera-api' | null;
   modelLoaded: boolean;
   sessionId: string | null;
   sampled: number;
@@ -80,6 +85,11 @@ export interface AIStatus {
   lastError: string | null;
   lastSubmittedAt: string | null;
   config: AIConfig | null;
+  apiCalls: number;
+  lastInferenceMs: number | null;
+  lastInferenceAt: string | null;
+  lastFaces: { emotion: Emotion | null; score: number }[];
+  stopReason: 'REQUESTED' | 'MAX_SAMPLES' | 'TIME_LIMIT' | 'ERROR' | null;
 }
 
 export interface VisionSample {

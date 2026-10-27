@@ -3,7 +3,7 @@ from enum import StrEnum
 from typing import Generic, Literal, TypeVar
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic.alias_generators import to_camel
 
 
@@ -60,6 +60,17 @@ class AIResult(Contract):
     device_id: str = Field(min_length=1, max_length=100)
     source: Literal["AI"] = "AI"
     simulated: bool = False
+    inference_provider: Literal["DeepSeek", "DeepFace"] | None = None
+    confidence_kind: Literal["self_reported", "model_score"] | None = None
+
+    @model_validator(mode="after")
+    def score_metadata(self):
+        if (
+            self.inference_provider == "DeepSeek"
+            and self.confidence_kind != "self_reported"
+        ):
+            raise ValueError("DeepSeek 分数必须标为模型自评分")
+        return self
 
     @field_validator("recorded_at")
     @classmethod

@@ -19,6 +19,8 @@ EMOTION_MAP = {
 class Prediction:
     label: str
     confidence: float
+    inference_provider: str | None = None
+    confidence_kind: str | None = None
 
 
 def map_predictions(
@@ -28,6 +30,7 @@ def map_predictions(
     device_id: str,
     threshold: float,
     simulated: bool = False,
+    recorded_at: str | None = None,
 ) -> tuple[list[dict], int]:
     results = []
     filtered = 0
@@ -46,10 +49,20 @@ def map_predictions(
                 "sessionId": session_id,
                 "emotion": emotion,
                 "confidence": prediction.confidence,
-                "recordedAt": datetime.now(timezone.utc).isoformat(),
+                "recordedAt": recorded_at or datetime.now(timezone.utc).isoformat(),
                 "source": "AI",
                 "deviceId": device_id,
                 "simulated": simulated,
+                **(
+                    {"inferenceProvider": prediction.inference_provider}
+                    if prediction.inference_provider
+                    else {}
+                ),
+                **(
+                    {"confidenceKind": prediction.confidence_kind}
+                    if prediction.confidence_kind
+                    else {}
+                ),
             }
         )
     return results, filtered
@@ -93,9 +106,18 @@ class DeepFaceModel:
 
 class Camera:
     def __init__(self, index: int):
-        import cv2
+        import sys
 
-        self.capture = cv2.VideoCapture(index)
+        try:
+            import cv2
+        except ImportError:
+            raise RuntimeError(
+                "未安装摄像头依赖，请安装 services/ai/requirements-camera.txt"
+            ) from None
+
+        self.capture = cv2.VideoCapture(
+            index, cv2.CAP_DSHOW if sys.platform == "win32" else cv2.CAP_ANY
+        )
         if not self.capture.isOpened():
             self.capture.release()
             raise RuntimeError("无法打开摄像头，请检查设备编号和系统权限")

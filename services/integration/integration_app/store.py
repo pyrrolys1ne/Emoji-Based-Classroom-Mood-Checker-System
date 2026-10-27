@@ -130,6 +130,8 @@ class Store:
                         "recordedAt",
                         "deviceId",
                         "simulated",
+                        "inferenceProvider",
+                        "confidenceKind",
                     )
                 ):
                     raise ValueError("幂等键对应的结果不一致")

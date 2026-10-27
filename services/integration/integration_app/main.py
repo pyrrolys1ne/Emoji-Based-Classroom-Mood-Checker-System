@@ -25,7 +25,7 @@ from fastapi import (
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .store import Store
@@ -65,6 +65,17 @@ class Result(BaseModel):
     recordedAt: datetime
     deviceId: str = Field(min_length=1, max_length=100)
     simulated: bool = False
+    inferenceProvider: Literal["DeepSeek", "DeepFace"] | None = None
+    confidenceKind: Literal["self_reported", "model_score"] | None = None
+
+    @model_validator(mode="after")
+    def score_metadata(self):
+        if (
+            self.inferenceProvider == "DeepSeek"
+            and self.confidenceKind != "self_reported"
+        ):
+            raise ValueError("DeepSeek 分数必须标为模型自评分")
+        return self
 
     @field_validator("emotion")
     @classmethod
@@ -83,10 +94,21 @@ class Result(BaseModel):
 
 class AIConfig(BaseModel):
     sessionId: UUID
-    mode: Literal["simulation", "camera"]
+    mode: Literal["simulation", "camera", "camera-api"]
     sampleIntervalSeconds: float = Field(ge=0.5, le=60)
     confidenceThreshold: float = Field(ge=0, le=1)
     cameraIndex: int = Field(ge=0, le=10)
+    allowRemoteUpload: bool = False
+    maxSamples: int = Field(default=5, ge=1, le=60)
+    maxDurationSeconds: int = Field(default=120, ge=10, le=600)
+
+    @model_validator(mode="after")
+    def remote_camera(self):
+        if self.mode == "camera-api" and (
+            not self.allowRemoteUpload or self.sampleIntervalSeconds < 5
+        ):
+            raise ValueError("远程摄像头需要明确允许发送，采样间隔至少 5 秒")
+        return self
 
 
 class ImageRequest(BaseModel):
@@ -278,10 +300,12 @@ def create_app(database_path: str | None = None, *, testing=False) -> FastAPI:
                 "课堂编号",
                 "情绪",
                 "来源",
-                "置信度",
+                "模型分数",
                 "时间",
                 "设备",
                 "模拟输入",
+                "推理提供方",
+                "分数类型",
             ]
         )
         for row in store.records({item["id"] for item in visible(user)}):
@@ -296,6 +320,8 @@ def create_app(database_path: str | None = None, *, testing=False) -> FastAPI:
                     "recordedAt",
                     "deviceId",
                     "simulated",
+                    "inferenceProvider",
+                    "confidenceKind",
                 )
             ]
             writer.writerow(

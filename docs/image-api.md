@@ -34,13 +34,15 @@ $env:PYTHONPATH = 'services/ai'
 
 ## 接口与边界
 
+本页的公开样本分析与 [摄像头实验](camera-api.md) 是两个入口。摄像头实验通过独立启动参数明确允许发送实时帧，并配置有限次数与时长；同样不保存原始影像，但可将匿名结构化结果写入所选课堂。
+
 管理员调用 `GET /api/admin/ai/vision` 获取配置状态和样本目录，调用 `POST /api/admin/ai/analyze-image` 提交 `{ "imageId": "portrait-01", "allowRemoteUpload": true }`。参考服务通过独立控制令牌转发到 AI 服务的 `/control/vision` 和 `/control/analyze-image`。正式后端尚未实现这些代理。
 
 接口只接受清单内已下载样本的编号，不接受任意文件路径或远程 URL。AI 服务将清除元数据后的 JPEG 以内联 base64 发送至固定官方地址 `https://api.deepseek.com/chat/completions`，禁止 HTTP 重定向。上游使用 JSON 输出，严格校验类别、分数范围、字段与完成状态；不完整、越界或未知类别不作为成功返回。
 
 结果包括 `provider`、`model`、`imageId`、`faces`、`elapsedMs`，以及 `confidenceKind: "self_reported"`、`calibrated: false`、`sampleOnly: true`、`persisted: false`。每个人脸包含 `label`、`score` 与系统 `emotion`；不确定类别对应 `emotion: null`。映射沿用七种基本表情，禁止推断“专注”“困惑”、身份或人口属性。
 
-模型自评分未经校准，不能直接作为准确率、识别概率、心理状态或学习理解程度。样本分析不经过课堂上报队列，不写入课堂数据库，不影响统计图表。摄像头不会因图片分析而开启；摄像头模式仍使用独立的本地模型适配。公开样本存储不改变真实课堂原始影像默认不保存、不上传的约束。
+模型自评分未经校准，不能直接作为准确率、识别概率、心理状态或学习理解程度。样本分析不经过课堂上报队列，不写入课堂数据库，不影响统计图表。摄像头不会因图片分析而开启；摄像头可显式选择独立的本地模型或 DeepSeek 远程适配。公开样本存储不改变真实课堂原始影像默认不保存、不上传的约束。
 
 ## 依据
 

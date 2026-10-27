@@ -253,3 +253,48 @@ def test_image_analysis_admin_proxy_and_consent(clients, monkeypatch):
     )
     assert response.status_code == 200 and response.json()["data"]["faces"] == []
     assert "internal-control" not in response.text
+
+
+def test_remote_camera_metadata_is_persisted_exported_and_idempotent(clients):
+    client, admin, teacher, _ = clients
+    session = client.get("/api/sessions", headers=admin).json()["data"][0]
+    body = payload(
+        session["id"],
+        simulated=False,
+        deviceId="camera-api-0",
+        inferenceProvider="DeepSeek",
+        confidenceKind="self_reported",
+    )
+    response = ingest(client, body, "camera-event")
+    assert response.status_code == 200
+    record = client.get("/api/emoji/history", headers=teacher).json()["data"][0]
+    assert (
+        record["inferenceProvider"] == "DeepSeek"
+        and record["confidenceKind"] == "self_reported"
+    )
+    assert record["simulated"] is False and record["userId"] is None
+    assert not ingest(client, body, "camera-event").json()["data"]["created"]
+    assert (
+        ingest(
+            client, {**body, "inferenceProvider": "DeepFace"}, "camera-event"
+        ).status_code
+        == 409
+    )
+    assert ingest(client, {**body, "confidenceKind": "model_score"}).status_code == 422
+    csv = client.get("/api/admin/emoji/export", headers=admin).text
+    assert "DeepSeek" in csv and "self_reported" in csv
+    assert (
+        client.post(
+            "/api/admin/ai/start",
+            headers=admin,
+            json={
+                "sessionId": session["id"],
+                "mode": "camera-api",
+                "sampleIntervalSeconds": 10,
+                "confidenceThreshold": 0.75,
+                "cameraIndex": 0,
+                "allowRemoteUpload": False,
+            },
+        ).status_code
+        == 422
+    )

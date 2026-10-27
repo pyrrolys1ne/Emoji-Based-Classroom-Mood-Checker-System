@@ -2,13 +2,15 @@
 
 软件工程实践项目。学生通过 emoji 反馈课堂感受，教师查看课堂历史、实时看板与多维统计，管理员管理用户、安排课堂学生并导出数据；独立 AI 服务负责视频情绪分析。
 
-管理端提供登录适配、教师视图、实时连接、日期时间统计、CSV 和 AI 控制页面；独立本地联调服务可验证“模拟采样 → 过滤 → 上报 → SQLite 保存 → 看板更新”。AI 服务包含模型适配、采样、持久化重试与启停。正式后端的接口状态见 API 文档；摄像头模式需要额外安装模型依赖。详见 [管理端与 AI 开发说明](docs/admin-ai.md)。
+管理端提供登录适配、教师视图、实时连接、日期时间统计、CSV 和 AI 控制页面；独立本地联调服务可验证“采样 → 过滤 → 上报 → SQLite 保存 → 看板更新”。AI 服务包含模型适配、采样、持久化重试与启停。正式后端的接口状态见 API 文档；本地 DeepFace 摄像头模式需要额外安装模型依赖。详见 [管理端与 AI 开发说明](docs/admin-ai.md)。
 
 启动联调：首次执行 `.venv` 创建命令，并安装 `services/integration/requirements.txt` 与 `services/ai/requirements.txt` 中的依赖；之后运行 `npm run dev:integration`，打开 <http://127.0.0.1:5175>。合成账号 `admin` 或 `teacher`，密码均为 `integration-only`，仅供开发联调。
 
-## 项目结构
+本机摄像头可使用 DeepSeek API 做有次数与时长上限的采样实验，无需本地模型权重；只需安装 `services/ai/requirements-camera.txt`，详见 [摄像头 API 实验](docs/camera-api.md)。
 
 图片表情分析可调用 DeepSeek `deepseek-flash`，无需安装本地模型。支持公开人像样本下载、无人脸对照与管理员分析页面，配置和命令见 [图片 API 说明](docs/image-api.md)。样本结果仅供测试，不写入课堂统计。
+
+## 项目结构
 
 ```text
 apps/

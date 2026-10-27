@@ -86,7 +86,7 @@ function RecordTable({ data, records }: { data: WorkspaceData; records: EmojiRec
             <th>用户</th>
             <th>课程 / 班级</th>
             <th>来源</th>
-            <th>置信度</th>
+            <th>模型分数</th>
             <th>时间</th>
           </tr>
         </thead>
@@ -107,11 +107,21 @@ function RecordTable({ data, records }: { data: WorkspaceData; records: EmojiRec
                 </td>
                 <td>
                   <span className={`tag ${record.source === 'AI' ? 'purple' : ''}`}>
-                    {record.simulated ? 'AI 模拟' : record.source === 'AI' ? 'AI 识别' : '手动提交'}
+                    {record.simulated
+                      ? 'AI 模拟'
+                      : record.inferenceProvider === 'DeepSeek'
+                        ? 'AI · DeepSeek'
+                        : record.source === 'AI'
+                          ? 'AI 识别'
+                          : '手动提交'}
                   </span>
                 </td>
                 <td>
-                  {record.confidence === null ? '—' : `${Math.round(record.confidence * 100)}%`}
+                  {record.confidence === null
+                    ? '—'
+                    : record.confidenceKind === 'self_reported'
+                      ? `自评分 ${record.confidence.toFixed(2)}`
+                      : `${Math.round(record.confidence * 100)}%`}
                 </td>
                 <td>
                   {new Date(record.recordedAt).toLocaleString('zh-CN', {

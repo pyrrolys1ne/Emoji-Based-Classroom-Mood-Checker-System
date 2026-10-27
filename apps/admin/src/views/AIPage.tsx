@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { AIConfig, AIStatus, ClassSession } from '@mood/contracts';
+import { emotions, type AIConfig, type AIStatus, type ClassSession } from '@mood/contracts';
 import { isDemo, request } from '../repositories/http';
 import { VisionImagePanel } from './components/VisionImagePanel';
 
@@ -10,6 +10,9 @@ export function AIPage({ sessions }: { sessions: ClassSession[] }) {
     sampleIntervalSeconds: 2,
     confidenceThreshold: 0.75,
     cameraIndex: 0,
+    allowRemoteUpload: false,
+    maxSamples: 5,
+    maxDurationSeconds: 120,
   });
   const [status, setStatus] = useState<AIStatus | null>(null);
   const [error, setError] = useState('');
@@ -24,6 +27,9 @@ export function AIPage({ sessions }: { sessions: ClassSession[] }) {
         if (active) {
           setStatus(next);
           setError('');
+          if (next.stopReason === 'MAX_SAMPLES') setMessage('已达到采样次数上限，采集已停止。');
+          else if (next.stopReason === 'TIME_LIMIT') setMessage('已达到实验时长上限，采集已停止。');
+          else if (next.stopReason === 'ERROR') setMessage('');
         }
       } catch (reason) {
         if (active) setError(reason instanceof Error ? reason.message : 'AI 服务不可用');
@@ -74,7 +80,8 @@ export function AIPage({ sessions }: { sessions: ClassSession[] }) {
         </div>
         <div className="ai-body">
           <div className="notice">
-            默认使用模拟输入验证集成；模拟记录明确标注，不代表模型推理。真实摄像头模式需安装模型依赖，并由你手动启动。
+            摄像头实验支持 DeepSeek API 或本地 DeepFace。API
+            模式仅需摄像头依赖，读取设备后释放，图像只在内存中处理；默认最多采样 5 次后停止。
           </div>
           {isDemo && (
             <p className="muted">
@@ -101,11 +108,17 @@ export function AIPage({ sessions }: { sessions: ClassSession[] }) {
               <select
                 value={config.mode}
                 onChange={(event) =>
-                  setConfig({ ...config, mode: event.target.value as AIConfig['mode'] })
+                  setConfig({
+                    ...config,
+                    mode: event.target.value as AIConfig['mode'],
+                    allowRemoteUpload: false,
+                    ...(event.target.value === 'camera-api' ? { sampleIntervalSeconds: 10 } : {}),
+                  })
                 }
                 disabled={status?.running}
               >
                 <option value="simulation">模拟输入（不使用摄像头）</option>
+                <option value="camera-api">本机摄像头 + DeepSeek API</option>
                 <option value="camera">真实摄像头 + DeepFace</option>
               </select>
             </label>
@@ -113,7 +126,7 @@ export function AIPage({ sessions }: { sessions: ClassSession[] }) {
               采样间隔（秒）
               <input
                 type="number"
-                min="0.5"
+                min={config.mode === 'camera-api' ? 5 : 0.5}
                 max="60"
                 step="0.5"
                 value={config.sampleIntervalSeconds}
@@ -124,7 +137,9 @@ export function AIPage({ sessions }: { sessions: ClassSession[] }) {
               />
             </label>
             <label>
-              置信度阈值（0—1）
+              {config.mode === 'camera-api'
+                ? '自评分过滤阈值（0—1，未经校准）'
+                : '置信度阈值（0—1）'}
               <input
                 type="number"
                 min="0"
@@ -137,7 +152,7 @@ export function AIPage({ sessions }: { sessions: ClassSession[] }) {
                 disabled={status?.running}
               />
             </label>
-            {config.mode === 'camera' && (
+            {config.mode !== 'simulation' && (
               <label>
                 摄像头编号
                 <input
@@ -152,7 +167,50 @@ export function AIPage({ sessions }: { sessions: ClassSession[] }) {
                 />
               </label>
             )}
+            {config.mode === 'camera-api' && (
+              <>
+                <label>
+                  最多采样次数
+                  <input
+                    type="number"
+                    min="1"
+                    max="60"
+                    value={config.maxSamples}
+                    disabled={status?.running}
+                    onChange={(event) =>
+                      setConfig({ ...config, maxSamples: Number(event.target.value) })
+                    }
+                  />
+                </label>
+                <label>
+                  最长实验时长（秒）
+                  <input
+                    type="number"
+                    min="10"
+                    max="600"
+                    value={config.maxDurationSeconds}
+                    disabled={status?.running}
+                    onChange={(event) =>
+                      setConfig({ ...config, maxDurationSeconds: Number(event.target.value) })
+                    }
+                  />
+                </label>
+              </>
+            )}
           </div>
+          {config.mode === 'camera-api' && (
+            <label className="vision-consent">
+              <input
+                type="checkbox"
+                checked={config.allowRemoteUpload ?? false}
+                disabled={status?.running}
+                onChange={(event) =>
+                  setConfig({ ...config, allowRemoteUpload: event.target.checked })
+                }
+              />
+              将摄像头采样帧发送至 DeepSeek 进行表情分析；匿名结构化结果写入所选课堂。
+            </label>
+          )}
           {error && (
             <p className="login-error" role="alert">
               {error}
@@ -179,7 +237,15 @@ export function AIPage({ sessions }: { sessions: ClassSession[] }) {
                 config.sampleIntervalSeconds < 0.5 ||
                 config.sampleIntervalSeconds > 60 ||
                 config.confidenceThreshold < 0 ||
-                config.confidenceThreshold > 1
+                config.confidenceThreshold > 1 ||
+                (config.mode === 'camera-api' &&
+                  (!config.allowRemoteUpload ||
+                    config.sampleIntervalSeconds < 5 ||
+                    !config.maxSamples ||
+                    config.maxSamples > 60 ||
+                    !config.maxDurationSeconds ||
+                    config.maxDurationSeconds < 10 ||
+                    config.maxDurationSeconds > 600))
               }
               onClick={() => void act('start')}
             >
@@ -219,11 +285,13 @@ export function AIPage({ sessions }: { sessions: ClassSession[] }) {
           <dl className="status-grid">
             <dt>运行模式</dt>
             <dd>
-              {status?.mode === 'camera'
-                ? '真实摄像头'
-                : status?.mode === 'simulation'
-                  ? '模拟输入'
-                  : '尚未启动'}
+              {status?.mode === 'camera-api'
+                ? '本机摄像头 + DeepSeek API'
+                : status?.mode === 'camera'
+                  ? '真实摄像头'
+                  : status?.mode === 'simulation'
+                    ? '模拟输入'
+                    : '尚未启动'}
             </dd>
             <dt>模型状态</dt>
             <dd>{status?.modelLoaded ? '已完成真实推理' : '未完成真实推理'}</dd>
@@ -241,9 +309,43 @@ export function AIPage({ sessions }: { sessions: ClassSession[] }) {
             </dd>
             <dt>失败次数</dt>
             <dd>{status?.failed ?? '—'}</dd>
+            <dt>API 调用次数</dt>
+            <dd>{status?.apiCalls ?? '—'}</dd>
+            <dt>最近推理耗时</dt>
+            <dd>
+              {status?.lastInferenceMs != null
+                ? `${(status.lastInferenceMs / 1000).toFixed(1)} 秒`
+                : '暂无'}
+            </dd>
+            <dt>最近表情结果</dt>
+            <dd>
+              {status?.lastInferenceAt
+                ? status.lastFaces.length
+                  ? status.lastFaces
+                      .map(
+                        (face) =>
+                          `${face.emotion ? emotions[face.emotion].label : '无法确定'} ${face.score.toFixed(2)}`,
+                      )
+                      .join('、')
+                  : '未检出人脸'
+                : '暂无'}
+            </dd>
+            <dt>停止原因</dt>
+            <dd>
+              {status?.stopReason
+                ? {
+                    REQUESTED: '手动停止',
+                    MAX_SAMPLES: '达到采样次数上限',
+                    TIME_LIMIT: '达到实验时长上限',
+                    ERROR: '运行错误',
+                  }[status.stopReason]
+                : '—'}
+            </dd>
           </dl>
           <p className="privacy-copy">
-            默认不保存原始视频、人脸图像或人脸特征；只发送匿名情绪、置信度、时间、设备标识和课堂编号。网络失败时只持久化结构化结果，以同一幂等键重试。
+            默认不保存原始视频、人脸图像或人脸特征。仅在明确允许的 DeepSeek
+            摄像头模式下发送采样帧；入库与重试队列只保存匿名结构化结果。API
+            自评分未经校准，不能作为准确率或心理状态。
           </p>
           <p className="privacy-copy">
             开心、平静、低落、生气、惊讶、害怕、厌恶对应模型表情类别；“专注”和“困惑”保留为手动反馈选项，不从模型结果推断。
