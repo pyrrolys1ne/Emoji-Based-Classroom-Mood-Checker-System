@@ -1,0 +1,5 @@
+# 建议在独立 Python 3.11 或 3.12 环境中安装，不随基础联调安装。
+-r requirements.txt
+opencv-python>=4.10,<5
+deepface>=0.0.93,<1
+tf-keras>=2.16,<3

@@ -10,6 +10,7 @@ services:
     volumes:
       - mood_pgdata:/var/lib/postgresql/data
       - ./infra/database/001_initial.sql:/docker-entrypoint-initdb.d/001_initial.sql:ro
+      - ./infra/database/002_model_emotions.sql:/docker-entrypoint-initdb.d/002_model_emotions.sql:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
       interval: 5s

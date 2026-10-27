@@ -4,6 +4,10 @@ export const emotions = {
   NEUTRAL: { emoji: '😐', label: '平静', color: '#a79457' },
   CONFUSED: { emoji: '🤔', label: '困惑', color: '#d58a44' },
   SAD: { emoji: '😔', label: '低落', color: '#9b83bb' },
+  ANGRY: { emoji: '😠', label: '生气', color: '#c96464' },
+  SURPRISED: { emoji: '😮', label: '惊讶', color: '#c79736' },
+  FEAR: { emoji: '😨', label: '害怕', color: '#658aac' },
+  DISGUST: { emoji: '😣', label: '厌恶', color: '#8d9960' },
 } as const;
 
 export type Emotion = keyof typeof emotions;
@@ -35,6 +39,7 @@ export interface EmojiRecord {
   source: RecordSource;
   confidence: number | null;
   recordedAt: string;
+  simulated?: boolean;
 }
 export interface WorkspaceData {
   users: User[];
@@ -49,4 +54,30 @@ export interface ApiResponse<T> {
 export interface EmojiSubmission {
   sessionId: string;
   emotion: Emotion;
+}
+
+export interface AuthSession {
+  token: string;
+  user: User;
+}
+export interface AIConfig {
+  sessionId: string;
+  mode: 'simulation' | 'camera';
+  sampleIntervalSeconds: number;
+  confidenceThreshold: number;
+  cameraIndex: number;
+}
+export interface AIStatus {
+  running: boolean;
+  mode: 'simulation' | 'camera' | null;
+  modelLoaded: boolean;
+  sessionId: string | null;
+  sampled: number;
+  submitted: number;
+  filtered: number;
+  failed: number;
+  pending: number;
+  lastError: string | null;
+  lastSubmittedAt: string | null;
+  config: AIConfig | null;
 }

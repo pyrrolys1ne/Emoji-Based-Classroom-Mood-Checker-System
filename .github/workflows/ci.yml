@@ -13,6 +13,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      - run: npm run test:admin
   backend:
     runs-on: ubuntu-latest
     steps:
@@ -25,3 +26,15 @@ jobs:
       - run: pip install -r services/backend/requirements-dev.txt
       - run: python -m pytest -q
         working-directory: services/backend
+  admin-ai-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install -r services/integration/requirements.txt -r services/ai/requirements.txt
+      - run: python -m pytest -q
+        working-directory: services/integration
+      - run: python -m pytest -q
+        working-directory: services/ai

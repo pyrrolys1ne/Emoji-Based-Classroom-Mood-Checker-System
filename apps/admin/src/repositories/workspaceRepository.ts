@@ -1,18 +1,8 @@
-import { emotions, type ApiResponse, type WorkspaceData } from '@mood/contracts';
+import { emotions, type WorkspaceData } from '@mood/contracts';
+import { cachedAuth, isDemo, request } from './http';
 
-export const isDemo = (import.meta.env.VITE_DATA_MODE ?? 'demo') === 'demo';
-const base = (import.meta.env.VITE_API_BASE_URL ?? '/api').replace(/\/$/, '');
+export { isDemo } from './http';
 const storageKey = 'mood-demo-schedules-v1';
-
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${base}${path}`, {
-    ...init,
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
-  });
-  const body = (await response.json()) as ApiResponse<T>;
-  if (!response.ok) throw new Error(body.message ?? `请求失败：${response.status}`);
-  return body.data;
-}
 
 function seed(): WorkspaceData {
   const users: WorkspaceData['users'] = Array.from({ length: 12 }, (_, index) => ({
@@ -122,7 +112,9 @@ export const workspaceRepository = {
   async load(): Promise<WorkspaceData> {
     if (isDemo) return seed();
     const [users, sessions, records] = await Promise.all([
-      request<WorkspaceData['users']>('/admin/users'),
+      cachedAuth()?.user.role === 'ADMIN'
+        ? request<WorkspaceData['users']>('/admin/users')
+        : Promise.resolve([]),
       request<WorkspaceData['sessions']>('/sessions'),
       request<WorkspaceData['records']>('/emoji/history'),
     ]);

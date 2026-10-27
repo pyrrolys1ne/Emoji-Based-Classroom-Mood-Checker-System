@@ -12,6 +12,14 @@ export function sessionRecords(data: WorkspaceData, sessionId: string) {
   return data.records.filter((record) => !sessionId || record.sessionId === sessionId);
 }
 
+export function recordUserLabel(data: WorkspaceData, record: EmojiRecord) {
+  if (!record.userId) return '匿名';
+  return (
+    data.users.find((user) => user.id === record.userId)?.username ??
+    `用户 ${record.userId.slice(0, 8)}`
+  );
+}
+
 export function csvCell(value: unknown) {
   const text = String(value ?? '');
   const safe = /^[\s]*[=+@-]|^[\t\r\n]/.test(text) ? `'${text}` : text;
@@ -20,18 +28,19 @@ export function csvCell(value: unknown) {
 
 export function exportRecords(data: WorkspaceData, records: EmojiRecord[]) {
   const rows = [
-    ['记录编号', '用户', '课程', '班级', '情绪', '来源', '置信度', '记录时间'],
+    ['记录编号', '用户', '课程', '班级', '情绪', '来源', '置信度', '记录时间', '模拟输入'],
     ...records.map((record) => {
       const session = data.sessions.find((item) => item.id === record.sessionId);
       return [
         record.id,
-        data.users.find((user) => user.id === record.userId)?.username ?? '匿名',
+        recordUserLabel(data, record),
         session?.courseName ?? '',
         session?.className ?? '',
         emotions[record.emotion].label,
         record.source,
         record.confidence ?? '',
         record.recordedAt,
+        record.simulated ? '是' : '否',
       ];
     }),
   ];

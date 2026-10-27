@@ -13,11 +13,23 @@ import {
   Smile,
   Users,
   X,
+  Cpu,
+  LogOut,
 } from 'lucide-react';
-import { emotions, type ClassSession, type EmojiRecord, type WorkspaceData } from '@mood/contracts';
+import {
+  emotions,
+  type ClassSession,
+  type EmojiRecord,
+  type WorkspaceData,
+  type User,
+} from '@mood/contracts';
 import { useWorkspace } from '../controllers/useWorkspace';
-import { distribution, exportRecords, sessionRecords } from '../models/workspace';
-import { isDemo } from '../repositories/workspaceRepository';
+import { exportRecords, sessionRecords, recordUserLabel } from '../models/workspace';
+import { isDemo, isIntegration } from '../repositories/http';
+import { useAuth } from '../controllers/useAuth';
+import { LoginPage } from './LoginPage';
+import { AIPage } from './AIPage';
+import { EmotionChart, Trend } from './components/Charts';
 
 const pages = [
   { id: 'dashboard', label: '课堂概览', icon: LayoutDashboard },
@@ -25,6 +37,7 @@ const pages = [
   { id: 'records', label: '情绪记录', icon: MessageCircle },
   { id: 'sessions', label: '课堂安排', icon: CalendarDays },
   { id: 'statistics', label: '多维统计', icon: BarChart3 },
+  { id: 'ai', label: 'AI 集成', icon: Cpu },
 ] as const;
 type Page = (typeof pages)[number]['id'];
 const time = (value: string) =>
@@ -62,87 +75,6 @@ function Empty() {
   return <div className="empty">暂无符合条件的数据</div>;
 }
 
-function EmotionChart({ records }: { records: EmojiRecord[] }) {
-  const items = distribution(records);
-  return (
-    <div className="emotion-chart">
-      {items.map((item) => (
-        <div className="emotion-row" key={item.key}>
-          <span className="emotion-name">
-            {item.emoji} {item.label}
-          </span>
-          <div className="bar-track">
-            <span
-              style={{
-                width: `${records.length ? (item.count / records.length) * 100 : 0}%`,
-                background: item.color,
-              }}
-            />
-          </div>
-          <strong>{item.count}</strong>
-          <span className="muted">
-            {records.length ? Math.round((item.count / records.length) * 100) : 0}%
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function Trend({ records }: { records: EmojiRecord[] }) {
-  const counts = Array.from(
-    { length: 6 },
-    (_, index) =>
-      records.filter(
-        (record) => Math.floor(new Date(record.recordedAt).getMinutes() / 10) === index,
-      ).length,
-  );
-  const max = Math.max(1, ...counts);
-  const points = counts
-    .map((count, index) => `${40 + index * 92},${145 - (count / max) * 108}`)
-    .join(' ');
-  return (
-    <div className="trend">
-      <svg viewBox="0 0 540 190" role="img" aria-label="按每小时内十分钟区间汇总的记录数量">
-        <defs>
-          <linearGradient id="area" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#3b9c7a" stopOpacity=".22" />
-            <stop offset="100%" stopColor="#3b9c7a" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        {[0, 1, 2].map((index) => (
-          <line
-            key={index}
-            x1="40"
-            x2="500"
-            y1={37 + index * 54}
-            y2={37 + index * 54}
-            stroke="#e8eeeb"
-            strokeDasharray="4 5"
-          />
-        ))}
-        <polygon points={`40,150 ${points} 500,150`} fill="url(#area)" />
-        <polyline
-          points={points}
-          fill="none"
-          stroke="#329374"
-          strokeWidth="3"
-          strokeLinejoin="round"
-        />
-        {counts.map((count, index) => (
-          <g key={index}>
-            <circle cx={40 + index * 92} cy={145 - (count / max) * 108} r="4" fill="#329374" />
-            <text x={40 + index * 92} y="178" textAnchor="middle">
-              {index * 10}–{index * 10 + 9}分
-            </text>
-          </g>
-        ))}
-      </svg>
-      <p className="chart-note">按记录时间的分钟数聚合 · 当前筛选范围</p>
-    </div>
-  );
-}
-
 function RecordTable({ data, records }: { data: WorkspaceData; records: EmojiRecord[] }) {
   if (!records.length) return <Empty />;
   return (
@@ -168,20 +100,27 @@ function RecordTable({ data, records }: { data: WorkspaceData; records: EmojiRec
                     {emotions[record.emotion].emoji} {emotions[record.emotion].label}
                   </span>
                 </td>
-                <td>{data.users.find((user) => user.id === record.userId)?.username ?? '匿名'}</td>
+                <td>{recordUserLabel(data, record)}</td>
                 <td>
                   {session?.courseName}
                   <small>{session?.className}</small>
                 </td>
                 <td>
                   <span className={`tag ${record.source === 'AI' ? 'purple' : ''}`}>
-                    {record.source === 'AI' ? 'AI 识别' : '手动提交'}
+                    {record.simulated ? 'AI 模拟' : record.source === 'AI' ? 'AI 识别' : '手动提交'}
                   </span>
                 </td>
                 <td>
                   {record.confidence === null ? '—' : `${Math.round(record.confidence * 100)}%`}
                 </td>
-                <td>{time(record.recordedAt)}</td>
+                <td>
+                  {new Date(record.recordedAt).toLocaleString('zh-CN', {
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </td>
               </tr>
             );
           })}
@@ -204,6 +143,7 @@ function Dashboard({
     records.filter((record) => record.userId).map((record) => record.userId),
   ).size;
   const aiCount = records.filter((record) => record.source === 'AI').length;
+  const simulatedCount = records.filter((record) => record.simulated).length;
   return (
     <>
       <div className="welcome">
@@ -230,7 +170,7 @@ function Dashboard({
           [
             'AI 采集占比',
             `${records.length ? Math.round((aiCount / records.length) * 100) : 0}%`,
-            `${aiCount} 条匿名识别记录`,
+            `${aiCount - simulatedCount} 条真实 · ${simulatedCount} 条模拟`,
             Smile,
           ],
         ].map(([label, value, hint, Icon]) => {
@@ -251,7 +191,7 @@ function Dashboard({
         <Panel title="课堂情绪分布" description="了解当前课堂的整体感受">
           <EmotionChart records={records} />
         </Panel>
-        <Panel title="反馈时间分布" description="每十分钟内的情绪记录数量">
+        <Panel title="反馈时间分布" description="按实际日期时间顺序查看反馈变化">
           <Trend records={records} />
         </Panel>
       </div>
@@ -343,7 +283,15 @@ function UsersPage({ data }: { data: WorkspaceData }) {
   );
 }
 
-function RecordsPage({ data, records }: { data: WorkspaceData; records: EmojiRecord[] }) {
+function RecordsPage({
+  data,
+  records,
+  canExport,
+}: {
+  data: WorkspaceData;
+  records: EmojiRecord[];
+  canExport: boolean;
+}) {
   const [source, setSource] = useState('');
   const [emotion, setEmotion] = useState('');
   const [page, setPage] = useState(1);
@@ -359,7 +307,11 @@ function RecordsPage({ data, records }: { data: WorkspaceData; records: EmojiRec
       title="情绪记录"
       description="按情绪类型和采集来源查找课堂反馈"
       action={
-        <button className="button" onClick={() => exportRecords(data, filtered)}>
+        <button
+          className="button"
+          disabled={!canExport}
+          onClick={() => exportRecords(data, filtered)}
+        >
           <ArrowDownToLine size={16} />
           导出 CSV
         </button>
@@ -506,8 +458,10 @@ function ScheduleDialog({
 function SessionsPage({
   data,
   save,
+  canEdit,
 }: {
   data: WorkspaceData;
+  canEdit: boolean;
   save: (sessionId: string, userIds: string[]) => Promise<void>;
 }) {
   const [editing, setEditing] = useState<ClassSession | null>(null);
@@ -533,7 +487,11 @@ function SessionsPage({
                 <span>
                   <Users size={15} /> {session.scheduledUserIds.length} 位学生
                 </span>
-                <button className="text-button" onClick={() => setEditing(session)}>
+                <button
+                  className="text-button"
+                  disabled={!canEdit}
+                  onClick={() => setEditing(session)}
+                >
                   安排学生 <ArrowRight size={15} />
                 </button>
               </div>
@@ -553,16 +511,16 @@ function StatisticsPage({ data, records }: { data: WorkspaceData; records: Emoji
   const [className, setClassName] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const invalid = Boolean(from && to && from > to);
+  const invalid = Boolean(from && to && Date.parse(from) >= Date.parse(to));
   const filtered = records.filter((record) => {
     const session = data.sessions.find((item) => item.id === record.sessionId);
-    const day = new Date(record.recordedAt).toLocaleDateString('sv-SE');
+    const timestamp = Date.parse(record.recordedAt);
     return (
       !invalid &&
       (!course || session?.courseId === course) &&
       (!className || session?.className === className) &&
-      (!from || day >= from) &&
-      (!to || day <= to)
+      (!from || timestamp >= Date.parse(from)) &&
+      (!to || timestamp < Date.parse(to))
     );
   });
   return (
@@ -614,8 +572,8 @@ function StatisticsPage({ data, records }: { data: WorkspaceData; records: Emoji
           <label className="date-filter">
             从{' '}
             <input
-              aria-label="开始日期"
-              type="date"
+              aria-label="开始时间"
+              type="datetime-local"
               value={from}
               onChange={(event) => setFrom(event.target.value)}
             />
@@ -623,14 +581,14 @@ function StatisticsPage({ data, records }: { data: WorkspaceData; records: Emoji
           <label className="date-filter">
             至{' '}
             <input
-              aria-label="结束日期"
-              type="date"
+              aria-label="结束时间"
+              type="datetime-local"
               value={to}
               onChange={(event) => setTo(event.target.value)}
             />
           </label>
         </div>
-        {invalid && <p className="error">结束日期不能早于开始日期。</p>}
+        {invalid && <p className="error">结束时间必须晚于开始时间（结束时刻不计入范围）。</p>}
       </Panel>
       <div className="two-columns">
         <Panel title="情绪构成">
@@ -686,8 +644,8 @@ function StatisticsPage({ data, records }: { data: WorkspaceData; records: Emoji
   );
 }
 
-export function App() {
-  const { data, loading, error, reload, schedule } = useWorkspace();
+function Workspace({ user, logout }: { user: User; logout: () => Promise<void> }) {
+  const { data, loading, error, reload, schedule, connection, lastUpdated } = useWorkspace();
   const [page, setPage] = useState<Page>(readPage);
   const [sessionId, setSessionId] = useState('');
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -702,6 +660,12 @@ export function App() {
     setPage(next);
     setMobileOpen(false);
   };
+  const allowedPages = pages.filter(
+    (item) => user.role === 'ADMIN' || !['users', 'ai'].includes(item.id),
+  );
+  useEffect(() => {
+    if (user.role !== 'ADMIN' && (page === 'users' || page === 'ai')) go('dashboard');
+  }, [user.role, page]);
   const active = pages.find((item) => item.id === page)!;
   const records = data ? sessionRecords(data, sessionId) : [];
   return (
@@ -724,7 +688,7 @@ export function App() {
         </div>
         <p className="nav-caption">工作空间</p>
         <nav>
-          {pages.map((item) => (
+          {allowedPages.map((item) => (
             <button
               key={item.id}
               className={page === item.id ? 'active' : ''}
@@ -745,12 +709,13 @@ export function App() {
           </div>
           <button className="help-button" onClick={() => setHelp((current) => !current)}>
             <CircleHelp size={18} />
-            框架使用说明
+            开发与联调说明
           </button>
           <div className="profile">
             <span className="profile-avatar">组</span>
             <div>
-              组长工作空间<small>管理端开发</small>
+              {user.username}
+              <small>{roleNames[user.role]}工作空间</small>
             </div>
             <span className="profile-dot" />
           </div>
@@ -780,9 +745,18 @@ export function App() {
           <div className="header-right">
             <span className={`mode-badge ${isDemo ? '' : 'api'}`}>
               <i />
-              {isDemo ? '演示模式' : 'API 模式'}
+              {isDemo ? '演示模式' : isIntegration ? '本地联调' : 'API 模式'}
             </span>
-            <span className="header-avatar">组</span>
+            <span className="header-avatar">{user.username[0]}</span>
+            {!isDemo && (
+              <button
+                className="icon-button"
+                aria-label="退出登录"
+                onClick={() => void logout().catch(() => {})}
+              >
+                <LogOut size={17} />
+              </button>
+            )}
           </div>
         </header>
         <main>
@@ -821,15 +795,36 @@ export function App() {
             <span className="notice-dot" />
             {isDemo
               ? '当前为本地演示数据。筛选、CSV 导出和课堂学生安排可操作，尚未连接真实账号与 AI。'
-              : '已切换 API 模式。业务接口与认证接入待后端实现，错误会在此页显示。'}
+              : isIntegration
+                ? '当前连接独立本地联调服务，使用合成账号与独立 SQLite 数据。模拟 AI 结果明确标注。'
+                : '当前连接团队后端 API。教师仅可查看所授课堂数据，角色与数据范围由服务端校验。'}
           </div>
+          {!isDemo && (
+            <div className={`connection-bar ${error ? 'offline' : ''}`} role="status">
+              <span>
+                {
+                  {
+                    connecting: '正在连接实时通道',
+                    live: '实时通道已连接',
+                    polling: '实时通道重连中 · 5 秒轮询兜底',
+                    offline: '数据连接中断，正在重试',
+                  }[connection]
+                }
+              </span>
+              <span>
+                {lastUpdated ? `上次同步 ${lastUpdated.toLocaleTimeString('zh-CN')}` : '尚未同步'}
+              </span>
+              {error && <span>{error}（保留上次成功数据）</span>}
+            </div>
+          )}
           {help && (
             <div className="help-panel">
               <h2>从这里开始开发</h2>
               <p>
                 管理端按 views、controllers、models、repositories 分层。默认演示模式可独立运行；通过
                 .env.local 中的 VITE_DATA_MODE=api 切换接口模式。后端接口文档位于
-                http://127.0.0.1:8000/docs，完整说明见仓库 README。
+                http://127.0.0.1:8000/docs。独立联调运行 npm run dev:integration，完整说明见
+                docs/admin-ai.md。
               </p>
               <button className="text-button" onClick={() => setHelp(false)}>
                 收起说明
@@ -838,7 +833,7 @@ export function App() {
           )}
           {loading ? (
             <div className="empty">正在加载课堂数据…</div>
-          ) : error ? (
+          ) : error && !data ? (
             <div className="error-panel">
               <h2>暂时无法加载数据</h2>
               <p>{error}</p>
@@ -851,18 +846,30 @@ export function App() {
               <div className="page-content" key={page}>
                 {page === 'dashboard' && <Dashboard data={data} records={records} go={go} />}
                 {page === 'users' && <UsersPage data={data} />}
-                {page === 'records' && <RecordsPage data={data} records={records} />}
-                {page === 'sessions' && <SessionsPage data={data} save={schedule} />}
+                {page === 'records' && (
+                  <RecordsPage data={data} records={records} canExport={user.role === 'ADMIN'} />
+                )}
+                {page === 'sessions' && (
+                  <SessionsPage data={data} save={schedule} canEdit={user.role === 'ADMIN'} />
+                )}
                 {page === 'statistics' && <StatisticsPage data={data} records={records} />}
+                {page === 'ai' && user.role === 'ADMIN' && <AIPage sessions={data.sessions} />}
               </div>
             )
           )}
           <footer>
             <span>课堂心晴 · 表情符号课堂情绪检查器系统</span>
-            <span>框架 v0.1 · {new Date().getFullYear()}</span>
+            <span>管理端与 AI 集成 v0.2 · {new Date().getFullYear()}</span>
           </footer>
         </main>
       </div>
     </div>
   );
+}
+
+export function App() {
+  const auth = useAuth();
+  if (auth.restoring) return <div className="empty">正在恢复登录状态…</div>;
+  if (!auth.user) return <LoginPage login={auth.login} />;
+  return <Workspace user={auth.user} logout={auth.logout} />;
 }

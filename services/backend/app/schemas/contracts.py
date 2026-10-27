@@ -8,7 +8,9 @@ from pydantic.alias_generators import to_camel
 
 
 class Contract(BaseModel):
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, extra="forbid")
+    model_config = ConfigDict(
+        alias_generator=to_camel, populate_by_name=True, extra="forbid"
+    )
 
 
 class Emotion(StrEnum):
@@ -17,6 +19,10 @@ class Emotion(StrEnum):
     NEUTRAL = "NEUTRAL"
     CONFUSED = "CONFUSED"
     SAD = "SAD"
+    ANGRY = "ANGRY"
+    SURPRISED = "SURPRISED"
+    FEAR = "FEAR"
+    DISGUST = "DISGUST"
 
 
 class RegisterRequest(Contract):
@@ -53,6 +59,7 @@ class AIResult(Contract):
     recorded_at: datetime
     device_id: str = Field(min_length=1, max_length=100)
     source: Literal["AI"] = "AI"
+    simulated: bool = False
 
     @field_validator("recorded_at")
     @classmethod

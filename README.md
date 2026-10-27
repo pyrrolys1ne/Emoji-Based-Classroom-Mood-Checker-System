@@ -2,7 +2,11 @@
 
 软件工程实践项目。学生通过 emoji 反馈课堂感受，教师查看课堂历史、实时看板与多维统计，管理员管理用户、安排课堂学生并导出数据；独立 AI 服务负责视频情绪分析。
 
-当前为 **v0.1 协作框架**：管理端与学生端演示页面可运行，后端提供健康检查、接口契约和安全边界，数据库提供初始结构，AI 服务提供健康检查与推理扩展点。真实账号、RBAC、业务持久化、实时推送和模型推理尚未实现。
+当前为 **v0.2 管理端与 AI 集成迭代**：管理端具有登录适配、教师视图、实时连接、日期时间统计、CSV 和 AI 控制页面；独立本地联调服务可验证“模拟采样 → 过滤 → 上报 → SQLite 保存 → 看板更新”。AI 已实现模型适配、采样、持久化重试与启停。正式后端仍由团队实现，真实摄像头与模型尚未实测。详见 [管理端与 AI 开发说明](docs/admin-ai.md)。
+
+本轮用户负责管理端 Web（MVC）、实时看板、多维统计和 AI 推理集成。其余成员分工待确认。
+
+启动联调：首次执行 `.venv` 创建命令，并安装 `services/integration/requirements.txt` 与 `services/ai/requirements.txt` 中的依赖；之后运行 `npm run dev:integration`，打开 <http://127.0.0.1:5175>。合成账号 `admin` 或 `teacher`，密码均为 `integration-only`，仅供本机开发。
 
 ## 目录与分工
 
@@ -24,6 +28,8 @@ services/
     app/core/            配置、认证扩展点、统一错误处理
     tests/               接口与安全边界检查
   ai/                    独立 AI 服务及推理管线扩展点
+  integration/           管理端与 AI 本地参考服务，非正式后端
+scripts/                 联调进程启动与关闭
 infra/                   PostgreSQL 初始脚本与 Dockerfile
 docs/                    架构、接口与团队协作说明
 .github/workflows/       前后端构建与测试 CI
@@ -70,7 +76,7 @@ AI 服务单独启动：
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --app-dir services/ai --reload --host 127.0.0.1 --port 8001
 ```
 
-访问 <http://127.0.0.1:8001/health>。该服务尚未加载模型、读取摄像头或上报记录。`pipeline.py` 是推理扩展点，`.env.example` 定义未来采样与上报配置约定。至少五种情绪枚举为初始 UI 分类，不意味着人脸模型可以直接、可靠地判断“专注”或“困惑”；正式映射须经实验验证。
+访问 <http://127.0.0.1:8001/health>。服务默认不采集；控制接口需要独立 `AI_CONTROL_TOKEN`，上报需要 `AI_SERVICE_TOKEN`。手动启动可添加 `--env-file services/ai/.env` 加载配置，联调脚本自动注入临时令牌。真实模型依赖位于 `requirements-model.txt`，基础联调无需安装。“专注”“困惑”仅作为手动反馈，AI 映射七种基本表情。真实模型及摄像头仍需实测。
 
 macOS / Linux 使用 `.venv/bin/python` 替换 `.venv\Scripts\python.exe`。
 
@@ -91,17 +97,17 @@ docker compose up --build -d
 
 复制 `apps/admin/.env.example` 为同目录 `.env.local`，设置 `VITE_DATA_MODE=api`。开发服务器把 `/api` 请求代理到后端 8000 端口。重启 Vite 后生效。
 
-目前 API 模式会显示后端未认证或未实现错误，这是预期行为。接入时先实现登录与服务端 RBAC，再在仓储层添加认证信息和明确的数据范围；不能通过前端角色判断替代服务端校验。默认演示模式没有真实账号认证。
+API 模式已支持登录、会话恢复与认证请求。正式后端目前仍返回未实现错误，接入前需补齐契约与权限校验。独立联调环境提供合成账号与服务端权限范围，便于先验证本人的模块。默认纯演示模式没有真实账号认证。
 
 ## 验证
 
 ```powershell
 npm run typecheck
+npm run test:admin
 npm run build
 Push-Location services/backend
 ..\..\.venv\Scripts\python.exe -m pytest -q
 Pop-Location
 ```
 
-CI 在推送及拉取请求中执行前端构建和后端测试。数据库、摄像头与完整业务链路测试在相应功能实现后补充。
-
+CI 执行前端构建、管理端模型测试、后端、AI 与独立联调测试。完整测试指令见 `docs/admin-ai.md`；正式 PostgreSQL、摄像头与模型效果评估仍需补充。

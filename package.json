@@ -12,6 +12,8 @@
   "scripts": {
     "dev:admin": "npm run dev --workspace @mood/admin",
     "dev:client": "npm run dev --workspace @mood/client",
+    "dev:integration": "node scripts/dev-integration.mjs",
+    "test:admin": "npm run test --workspace @mood/admin",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "format": "prettier --write .",

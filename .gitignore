@@ -13,9 +13,12 @@ __pycache__/
 .DS_Store
 Thumbs.db
 .idea/
+.docx
 .vscode/*
 !.vscode/extensions.json
 coverage/
 playwright-report/
 test-results/
 *.log
+.local/
+**/.local/
