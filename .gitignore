@@ -13,7 +13,7 @@ __pycache__/
 .DS_Store
 Thumbs.db
 .idea/
-.docx
+/《表情符号课堂情绪检查器系统》实验指导书.docx
 .vscode/*
 !.vscode/extensions.json
 coverage/
