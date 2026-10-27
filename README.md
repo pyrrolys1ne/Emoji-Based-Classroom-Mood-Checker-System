@@ -2,22 +2,20 @@
 
 软件工程实践项目。学生通过 emoji 反馈课堂感受，教师查看课堂历史、实时看板与多维统计，管理员管理用户、安排课堂学生并导出数据；独立 AI 服务负责视频情绪分析。
 
-当前为 **v0.2 管理端与 AI 集成迭代**：管理端具有登录适配、教师视图、实时连接、日期时间统计、CSV 和 AI 控制页面；独立本地联调服务可验证“模拟采样 → 过滤 → 上报 → SQLite 保存 → 看板更新”。AI 已实现模型适配、采样、持久化重试与启停。正式后端仍由团队实现，真实摄像头与模型尚未实测。详见 [管理端与 AI 开发说明](docs/admin-ai.md)。
+管理端提供登录适配、教师视图、实时连接、日期时间统计、CSV 和 AI 控制页面；独立本地联调服务可验证“模拟采样 → 过滤 → 上报 → SQLite 保存 → 看板更新”。AI 服务包含模型适配、采样、持久化重试与启停。正式后端的接口状态见 API 文档；摄像头模式需要额外安装模型依赖。详见 [管理端与 AI 开发说明](docs/admin-ai.md)。
 
-本轮用户负责管理端 Web（MVC）、实时看板、多维统计和 AI 推理集成。其余成员分工待确认。
+启动联调：首次执行 `.venv` 创建命令，并安装 `services/integration/requirements.txt` 与 `services/ai/requirements.txt` 中的依赖；之后运行 `npm run dev:integration`，打开 <http://127.0.0.1:5175>。合成账号 `admin` 或 `teacher`，密码均为 `integration-only`，仅供开发联调。
 
-启动联调：首次执行 `.venv` 创建命令，并安装 `services/integration/requirements.txt` 与 `services/ai/requirements.txt` 中的依赖；之后运行 `npm run dev:integration`，打开 <http://127.0.0.1:5175>。合成账号 `admin` 或 `teacher`，密码均为 `integration-only`，仅供本机开发。
-
-## 目录与分工
+## 项目结构
 
 ```text
 apps/
-  admin/                 管理端，组长负责；React + TypeScript + Vite
+  admin/                 管理端；React + TypeScript + Vite
     src/views/           页面、布局、展示组件
     src/controllers/     页面状态与业务交互
     src/models/          统计、CSV 与领域规则
     src/repositories/    演示数据与 API 访问
-  client/                学生端浏览器骨架；可由客户端负责人继续开发
+  client/                学生端浏览器界面
 packages/contracts/      前端共享类型与 emoji 枚举
 services/
   backend/               FastAPI 后端
@@ -33,7 +31,7 @@ scripts/                 联调进程启动与关闭
 infra/                   PostgreSQL 初始脚本与 Dockerfile
 docs/                    架构、接口与团队协作说明
 .github/workflows/       前后端构建与测试 CI
-AGENTS.md                中文对话与需求记录
+AGENTS.md                开发规范与技术约束
 ```
 
 ## 快速启动管理端
@@ -67,7 +65,7 @@ python -m venv .venv
 - Swagger 文档：<http://127.0.0.1:8000/docs>。
 - OpenAPI：<http://127.0.0.1:8000/openapi.json>。
 
-本地配置参考 `services/backend/.env.example`，复制为同目录 `.env` 后修改；配置文件路径独立于启动时所在目录。业务接口统一返回“尚未实现”，不会假装已写入数据库。未携带身份的受保护请求返回 401，任意占位令牌也不会获得用户权限。真实 JWT 与 RBAC 待后端负责人实现。
+本地配置参考 `services/backend/.env.example`，复制为同目录 `.env` 后修改；配置文件路径独立于启动时所在目录。业务接口统一返回“尚未实现”，不会假装已写入数据库。未携带身份的受保护请求返回 401，任意占位令牌也不会获得用户权限。JWT 与 RBAC 的正式实现位于后端模块。
 
 AI 服务单独启动：
 
@@ -76,7 +74,7 @@ AI 服务单独启动：
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --app-dir services/ai --reload --host 127.0.0.1 --port 8001
 ```
 
-访问 <http://127.0.0.1:8001/health>。服务默认不采集；控制接口需要独立 `AI_CONTROL_TOKEN`，上报需要 `AI_SERVICE_TOKEN`。手动启动可添加 `--env-file services/ai/.env` 加载配置，联调脚本自动注入临时令牌。真实模型依赖位于 `requirements-model.txt`，基础联调无需安装。“专注”“困惑”仅作为手动反馈，AI 映射七种基本表情。真实模型及摄像头仍需实测。
+访问 <http://127.0.0.1:8001/health>。服务默认不采集；控制接口需要独立 `AI_CONTROL_TOKEN`，上报需要 `AI_SERVICE_TOKEN`。手动启动可添加 `--env-file services/ai/.env` 加载配置，联调脚本自动注入临时令牌。真实模型依赖位于 `requirements-model.txt`，基础联调无需安装。“专注”“困惑”仅作为手动反馈，AI 映射七种基本表情。模型与摄像头的兼容性应在目标运行环境验证。
 
 macOS / Linux 使用 `.venv/bin/python` 替换 `.venv\Scripts\python.exe`。
 
@@ -91,13 +89,11 @@ docker compose up --build -d
 
 前端仍通过 npm 启动。数据库初始脚本为 `infra/database/001_initial.sql`，创建用户、课程、课堂会话、用户安排、情绪记录与审计日志。脚本只在空数据卷初始化时执行，后续变更请新增迁移脚本。未内置管理员账号；管理员初始化流程、密码加盐哈希和授权机制待实现。默认密码仅供本地开发，部署前更换。服务端口均绑定本机回环地址。
 
-当前开发环境未安装 Docker，因此容器构建、数据库脚本实际执行尚未验证。
-
 ## 管理端接入真实 API
 
 复制 `apps/admin/.env.example` 为同目录 `.env.local`，设置 `VITE_DATA_MODE=api`。开发服务器把 `/api` 请求代理到后端 8000 端口。重启 Vite 后生效。
 
-API 模式已支持登录、会话恢复与认证请求。正式后端目前仍返回未实现错误，接入前需补齐契约与权限校验。独立联调环境提供合成账号与服务端权限范围，便于先验证本人的模块。默认纯演示模式没有真实账号认证。
+API 模式已支持登录、会话恢复与认证请求。正式后端目前仍返回未实现错误，接入前需补齐契约与权限校验。独立联调环境提供合成账号与服务端权限范围，用于验证管理端与 AI 的接口。默认纯演示模式没有真实账号认证。
 
 ## 验证
 
@@ -110,4 +106,4 @@ Push-Location services/backend
 Pop-Location
 ```
 
-CI 执行前端构建、管理端模型测试、后端、AI 与独立联调测试。完整测试指令见 `docs/admin-ai.md`；正式 PostgreSQL、摄像头与模型效果评估仍需补充。
+CI 执行前端构建、管理端模型测试、后端、AI 与独立联调测试。完整测试指令见 `docs/admin-ai.md`。模型效果与部署兼容性应使用对应的运行环境评估。

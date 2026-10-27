@@ -1,6 +1,6 @@
 # API 协作草案
 
-版本：v0.2 管理端与 AI 协作草案。正式后端 `services/backend` 仍为占位，原表记录其当前行为。独立本地参考服务 `services/integration` 已实现下文新增约定，不能替代正式后端；正式后端负责人需确认并实现相关契约。
+版本：v0.2 管理端与 AI 协作草案。正式后端 `services/backend` 仍为占位，原表记录其当前行为。独立本地参考服务 `services/integration` 已实现下文新增约定，不能替代正式后端；业务接口应符合相关契约。
 
 统一响应结构：
 
@@ -33,7 +33,7 @@ JSON 字段使用小驼峰，例如手动提交为 `sessionId`、`emotion`；安
 
 前端 API 适配层暂定列表响应的 `data` 为数组；未来增加分页时需统一改为 `items`、`total` 等结构并同步类型与页面。服务端 CSV 导出和浏览器演示导出是不同实现，正式 CSV 接口仍待开发。
 
-## 管理端与 AI 迭代新增契约
+## 管理端与 AI 接口
 
 - 登录成功返回 `data: { token, user }`，用户包含 `id`、`username`、`email`、`role`、`status`。管理端接受管理员或教师。
 - `POST /api/auth/logout` 撤销令牌，关闭使用该会话的实时连接。

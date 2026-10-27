@@ -709,7 +709,7 @@ function Workspace({ user, logout }: { user: User; logout: () => Promise<void> }
           </div>
           <button className="help-button" onClick={() => setHelp((current) => !current)}>
             <CircleHelp size={18} />
-            开发与联调说明
+            使用说明
           </button>
           <div className="profile">
             <span className="profile-avatar">组</span>
@@ -767,7 +767,7 @@ function Workspace({ user, logout }: { user: User; logout: () => Promise<void> }
               <p>
                 {page === 'dashboard'
                   ? '每一份课堂反馈，都是更好教学的起点。'
-                  : '让课堂数据清晰、有序，便于团队继续完善。'}
+                  : '查看课堂反馈、课程统计与采集状态。'}
               </p>
             </div>
             <div className="page-actions">
@@ -819,12 +819,10 @@ function Workspace({ user, logout }: { user: User; logout: () => Promise<void> }
           )}
           {help && (
             <div className="help-panel">
-              <h2>从这里开始开发</h2>
+              <h2>数据与采集说明</h2>
               <p>
-                管理端按 views、controllers、models、repositories 分层。默认演示模式可独立运行；通过
-                .env.local 中的 VITE_DATA_MODE=api 切换接口模式。后端接口文档位于
-                http://127.0.0.1:8000/docs。独立联调运行 npm run dev:integration，完整说明见
-                docs/admin-ai.md。
+                课堂数据按当前账号权限显示。演示模式使用示例数据，联调模式使用独立测试数据。 模拟 AI
+                记录均单独标注；采集设置和启停状态可在 AI 集成页面查看。
               </p>
               <button className="text-button" onClick={() => setHelp(false)}>
                 收起说明
