@@ -81,3 +81,32 @@ export interface AIStatus {
   lastSubmittedAt: string | null;
   config: AIConfig | null;
 }
+
+export interface VisionSample {
+  id: string;
+  title: string;
+  sourceUrl: string | null;
+  credit: string;
+  license: string;
+  kind: 'portrait' | 'negative-control';
+  available: boolean;
+}
+export interface VisionStatus {
+  provider: 'DeepSeek';
+  model: string;
+  configured: boolean;
+  confidenceKind: 'self_reported';
+  calibrated: false;
+  samples: VisionSample[];
+}
+export interface VisionResult {
+  imageId: string;
+  provider: 'DeepSeek';
+  model: string;
+  confidenceKind: 'self_reported';
+  calibrated: false;
+  sampleOnly: true;
+  persisted: false;
+  elapsedMs: number;
+  faces: { label: string; score: number; emotion: Emotion | null }[];
+}

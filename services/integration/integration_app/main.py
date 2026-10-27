@@ -89,6 +89,12 @@ class AIConfig(BaseModel):
     cameraIndex: int = Field(ge=0, le=10)
 
 
+class ImageRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    imageId: str = Field(min_length=1, max_length=80)
+    allowRemoteUpload: Literal[True]
+
+
 def create_app(database_path: str | None = None, *, testing=False) -> FastAPI:
     store = Store(
         database_path
@@ -395,9 +401,9 @@ def create_app(database_path: str | None = None, *, testing=False) -> FastAPI:
         except (WebSocketDisconnect, RuntimeError):
             pass
 
-    async def ai_proxy(method: str, path: str, body=None):
+    async def ai_proxy(method: str, path: str, body=None, *, timeout=8):
         try:
-            async with httpx.AsyncClient(timeout=8, trust_env=False) as client:
+            async with httpx.AsyncClient(timeout=timeout, trust_env=False) as client:
                 response = await client.request(
                     method,
                     os.getenv("AI_CONTROL_URL", "http://127.0.0.1:8001") + path,
@@ -427,6 +433,16 @@ def create_app(database_path: str | None = None, *, testing=False) -> FastAPI:
     @app.post("/api/admin/ai/stop")
     async def ai_stop(_user=Depends(admin)):
         return await ai_proxy("POST", "/control/stop")
+
+    @app.get("/api/admin/ai/vision")
+    async def ai_vision(_user=Depends(admin)):
+        return await ai_proxy("GET", "/control/vision")
+
+    @app.post("/api/admin/ai/analyze-image")
+    async def ai_image(body: ImageRequest, _user=Depends(admin)):
+        return await ai_proxy(
+            "POST", "/control/analyze-image", body.model_dump(), timeout=40
+        )
 
     app.state.store = store
     return app

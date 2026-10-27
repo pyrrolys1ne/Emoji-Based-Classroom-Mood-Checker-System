@@ -20,13 +20,17 @@ export function saveAuth(session: AuthSession | null) {
   else sessionStorage.removeItem(key);
 }
 
-export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function request<T>(
+  path: string,
+  init: RequestInit = {},
+  timeoutMs = 10000,
+): Promise<T> {
   const token = cachedAuth()?.token;
   const response = await fetch(`${apiBase}${path}`, {
     ...init,
     signal: init.signal
-      ? AbortSignal.any([init.signal, AbortSignal.timeout(10000)])
-      : AbortSignal.timeout(10000),
+      ? AbortSignal.any([init.signal, AbortSignal.timeout(timeoutMs)])
+      : AbortSignal.timeout(timeoutMs),
     headers: {
       ...(init.body ? { 'Content-Type': 'application/json' } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),

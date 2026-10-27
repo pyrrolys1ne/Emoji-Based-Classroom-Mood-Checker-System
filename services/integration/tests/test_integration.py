@@ -202,3 +202,54 @@ def test_websocket_rejects_wrong_origin_and_revoked_session(clients):
     with pytest.raises(WebSocketDisconnect):
         with client.websocket_connect(f"/ws/dashboard?ticket={ticket}"):
             pass
+
+
+def test_image_analysis_admin_proxy_and_consent(clients, monkeypatch):
+    import httpx
+
+    client, admin, teacher, _ = clients
+    assert client.get("/api/admin/ai/vision").status_code == 401
+    assert client.get("/api/admin/ai/vision", headers=teacher).status_code == 403
+    assert (
+        client.post(
+            "/api/admin/ai/analyze-image",
+            headers=teacher,
+            json={
+                "imageId": "portrait-01",
+                "allowRemoteUpload": True,
+            },
+        ).status_code
+        == 403
+    )
+    assert (
+        client.post(
+            "/api/admin/ai/analyze-image",
+            headers=admin,
+            json={
+                "imageId": "portrait-01",
+                "allowRemoteUpload": False,
+            },
+        ).status_code
+        == 422
+    )
+    monkeypatch.setenv("AI_CONTROL_TOKEN", "internal-control")
+
+    async def fake_request(self, method, url, **kwargs):
+        assert kwargs["headers"]["Authorization"] == "Bearer internal-control"
+        assert self.timeout.read == 40
+        assert kwargs["json"] == {"imageId": "portrait-01", "allowRemoteUpload": True}
+        return httpx.Response(
+            200, json={"code": "OK", "message": "成功", "data": {"faces": []}}
+        )
+
+    monkeypatch.setattr(httpx.AsyncClient, "request", fake_request)
+    response = client.post(
+        "/api/admin/ai/analyze-image",
+        headers=admin,
+        json={
+            "imageId": "portrait-01",
+            "allowRemoteUpload": True,
+        },
+    )
+    assert response.status_code == 200 and response.json()["data"]["faces"] == []
+    assert "internal-control" not in response.text

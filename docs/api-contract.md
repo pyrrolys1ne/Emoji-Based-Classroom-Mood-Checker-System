@@ -1,5 +1,20 @@
 # API 协作草案
 
+## v0.3 图片分析增量
+
+以下接口已由独立联调服务和 AI 服务实现；正式后端尚未实现。既有 v0.2 业务契约保持有效。
+
+| 管理员代理                         | AI 内部控制接口               | 行为                                           |
+| ---------------------------------- | ----------------------------- | ---------------------------------------------- |
+| `GET /api/admin/ai/vision`         | `GET /control/vision`         | 返回提供方、模型、是否配置和样本可用性，无密钥 |
+| `POST /api/admin/ai/analyze-image` | `POST /control/analyze-image` | 单张公开样本远程表情分析，不入库               |
+
+请求必须包含 `imageId` 和 `allowRemoteUpload: true`，禁止其他字段。编号只能来自服务端样本清单，不接受任意路径或 URL。管理员代理要求用户管理员身份，内部接口要求独立 AI 控制令牌。未授权返回 401，教师返回 403，无效参数返回 422，缺少样本返回 404，未配置密钥返回 503，上游错误或无效结果返回 502。提供方密钥不经浏览器传输。
+
+响应结构见共享类型 `VisionStatus`、`VisionResult`。分析包含 `faces: [{ label, score, emotion }]`，无脸返回空数组，不确定返回 `emotion: null`。`confidenceKind: "self_reported"` 与 `calibrated: false` 明确分数未经校准，`sampleOnly: true`、`persisted: false` 表示结果不写入课堂统计。调用超时分别为 AI 上游 30 秒、代理 40 秒、页面 45 秒，不自动重试付费推理。详情见 [图片 API 说明](image-api.md)。
+
+## v0.2 基线
+
 版本：v0.2 管理端与 AI 协作草案。正式后端 `services/backend` 仍为占位，原表记录其当前行为。独立本地参考服务 `services/integration` 已实现下文新增约定，不能替代正式后端；业务接口应符合相关契约。
 
 统一响应结构：

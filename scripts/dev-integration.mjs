@@ -17,7 +17,11 @@ if (!existsSync(python)) {
   );
   process.exit(1);
 }
-for (const port of [8010, 8011, 5175]) {
+const aiPort = Number(process.env.MOOD_AI_PORT ?? 8011);
+if (!Number.isInteger(aiPort) || aiPort < 1024 || aiPort > 65535 || [8010, 5175].includes(aiPort)) {
+  throw new Error('MOOD_AI_PORT 必须是未被其他联调服务使用的 1024—65535 端口。');
+}
+for (const port of [8010, aiPort, 5175]) {
   await new Promise((resolve, reject) => {
     const server = net.createServer();
     server.once('error', () =>
@@ -32,7 +36,7 @@ const env = {
   MOOD_INTEGRATION: '1',
   MOOD_AI_SERVICE_TOKEN: randomBytes(32).toString('hex'),
   AI_CONTROL_TOKEN: randomBytes(32).toString('hex'),
-  AI_CONTROL_URL: 'http://127.0.0.1:8011',
+  AI_CONTROL_URL: `http://127.0.0.1:${aiPort}`,
   AI_BACKEND_URL: 'http://127.0.0.1:8010',
   MOOD_API_TARGET: 'http://127.0.0.1:8010',
   VITE_DATA_MODE: 'integration',
@@ -64,7 +68,7 @@ const commands = [
       '--host',
       '127.0.0.1',
       '--port',
-      '8011',
+      String(aiPort),
     ],
   ],
   [

@@ -1,0 +1,38 @@
+[
+  {
+    "id": "portrait-01",
+    "title": "正面人像 01",
+    "url": "https://images-assets.nasa.gov/image/S92-40463/S92-40463~orig.jpg",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Mae_Carol_Jemison.jpg",
+    "credit": "NASA · S92-40463",
+    "license": "Public domain (NASA / US government)",
+    "kind": "portrait"
+  },
+  {
+    "id": "portrait-02",
+    "title": "正面人像 02",
+    "url": "https://images-assets.nasa.gov/image/S99-00858/S99-00858~orig.jpg",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Commander_Eileen_Collins_-_GPN-2000-001177.jpg",
+    "credit": "NASA / Robert Markowitz · S99-00858",
+    "license": "Public domain (NASA / US government)",
+    "kind": "portrait"
+  },
+  {
+    "id": "side-view-01",
+    "title": "侧面人像 01",
+    "url": "https://images-assets.nasa.gov/image/s93e5033/s93e5033~orig.jpg",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Eileen_Collins_(S93-E-5033,_1999-07-24).jpg",
+    "credit": "NASA · S93-E-5033",
+    "license": "Public domain (NASA / US government)",
+    "kind": "portrait"
+  },
+  {
+    "id": "control-blank",
+    "title": "无人脸对照图",
+    "url": null,
+    "sourceUrl": null,
+    "credit": "程序生成的纯色图像",
+    "license": "CC0-1.0",
+    "kind": "negative-control"
+  }
+]

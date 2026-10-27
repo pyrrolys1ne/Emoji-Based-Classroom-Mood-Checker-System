@@ -4,6 +4,7 @@
 **/dist
 **/__pycache__
 **/.pytest_cache
+**/.local
 **/.env
 **/.env.local
 *.docx

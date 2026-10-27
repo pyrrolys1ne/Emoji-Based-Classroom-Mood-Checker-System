@@ -7,10 +7,17 @@ from uuid import UUID
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .runner import Runner
+from .vision import VisionError, analyze_sample, vision_status
+
+
+class ImageRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    imageId: str = Field(min_length=1, max_length=80)
+    allowRemoteUpload: Literal[True]
 
 
 class Config(BaseModel):
@@ -82,6 +89,18 @@ def create_app(outbox_path=None):
     def stop():
         runner.stop()
         return status()
+
+    @app.get("/control/vision", dependencies=[Depends(control)])
+    def get_vision():
+        return {"code": "OK", "message": "成功", "data": vision_status()}
+
+    @app.post("/control/analyze-image", dependencies=[Depends(control)])
+    def image(request: ImageRequest):
+        try:
+            result = analyze_sample(request.imageId)
+        except VisionError as exc:
+            raise HTTPException(exc.status, str(exc)) from None
+        return {"code": "OK", "message": "成功", "data": result}
 
     return app
 

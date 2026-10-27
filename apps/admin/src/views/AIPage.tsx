@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { AIConfig, AIStatus, ClassSession } from '@mood/contracts';
 import { isDemo, request } from '../repositories/http';
+import { VisionImagePanel } from './components/VisionImagePanel';
 
 export function AIPage({ sessions }: { sessions: ClassSession[] }) {
   const [config, setConfig] = useState<AIConfig>({
@@ -62,6 +63,7 @@ export function AIPage({ sessions }: { sessions: ClassSession[] }) {
   };
   return (
     <>
+      <VisionImagePanel />
       <section className="panel">
         <div className="panel-heading">
           <div>

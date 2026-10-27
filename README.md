@@ -8,6 +8,8 @@
 
 ## 项目结构
 
+图片表情分析可调用 DeepSeek `deepseek-flash`，无需安装本地模型。支持公开人像样本下载、无人脸对照与管理员分析页面，配置和命令见 [图片 API 说明](docs/image-api.md)。样本结果仅供测试，不写入课堂统计。
+
 ```text
 apps/
   admin/                 管理端；React + TypeScript + Vite
@@ -74,7 +76,7 @@ AI 服务单独启动：
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --app-dir services/ai --reload --host 127.0.0.1 --port 8001
 ```
 
-访问 <http://127.0.0.1:8001/health>。服务默认不采集；控制接口需要独立 `AI_CONTROL_TOKEN`，上报需要 `AI_SERVICE_TOKEN`。手动启动可添加 `--env-file services/ai/.env` 加载配置，联调脚本自动注入临时令牌。真实模型依赖位于 `requirements-model.txt`，基础联调无需安装。“专注”“困惑”仅作为手动反馈，AI 映射七种基本表情。模型与摄像头的兼容性应在目标运行环境验证。
+访问 <http://127.0.0.1:8001/health>。服务默认不采集；控制接口需要独立 `AI_CONTROL_TOKEN`，上报需要 `AI_SERVICE_TOKEN`。服务自动读取 `services/ai/.env`，已有进程环境变量优先，联调脚本自动注入临时令牌。真实模型依赖位于 `requirements-model.txt`，基础联调无需安装。“专注”“困惑”仅作为手动反馈，AI 映射七种基本表情。模型与摄像头的兼容性应在目标运行环境验证。
 
 macOS / Linux 使用 `.venv/bin/python` 替换 `.venv\Scripts\python.exe`。
 
