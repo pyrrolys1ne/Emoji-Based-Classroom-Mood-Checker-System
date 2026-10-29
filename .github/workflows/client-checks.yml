@@ -1,0 +1,27 @@
+name: Client checks
+on:
+  push:
+  pull_request:
+jobs:
+  client:
+    runs-on: ubuntu-latest
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.local/browsers
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run test:client
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium firefox
+      - run: npm run test:e2e --workspace @mood/client
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: client-browser-results
+          path: apps/client/test-results/
+          retention-days: 7
