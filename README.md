@@ -19,7 +19,7 @@ apps/
     src/controllers/     页面状态与业务交互
     src/models/          统计、CSV 与领域规则
     src/repositories/    演示数据与 API 访问
-  client/                学生端浏览器界面
+  client/                学生端与教师基础页；React + TypeScript + Vite
 packages/contracts/      前端共享类型与 emoji 枚举
 services/
   backend/               FastAPI 后端
@@ -50,11 +50,11 @@ npm run dev:admin
 打开 <http://127.0.0.1:5173>。默认使用演示数据，不依赖数据库或后端。包含课堂概览、用户目录、情绪记录、课堂学生安排和多维统计页面；支持筛选、分页、CSV 导出和本地安排保存。刷新会重新生成当天演示数据，安排结果保存在浏览器本地存储。
 
 ```powershell
-# 另开一个终端启动学生端演示
+# 另开一个终端启动客户端
 npm run dev:client
 ```
 
-学生端位于 <http://127.0.0.1:5174>，可选择表情并查看本次页面会话的演示历史。两个演示端的数据不互通，均不代表真实用户数据。
+客户端位于 <http://127.0.0.1:5174>，提供学生账号、课堂选择、表情反馈、持久演示历史、改密和退出，以及教师课堂历史与基础统计。默认演示模式有明确标识，可直接体验学生或教师；API 模式使用独立的真实接口适配，不会把接口失败显示为演示成功。两个演示端的数据不互通。配置、演示账号、架构和测试命令见 [客户端运行与维护](docs/client-development.md)，接口依赖见 [客户端对接约定](docs/client-integration.md)。正式后端业务仍待实现。
 
 ## 启动后端与 AI 骨架
 
