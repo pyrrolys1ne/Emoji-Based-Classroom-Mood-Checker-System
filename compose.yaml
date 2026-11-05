@@ -9,13 +9,21 @@ services:
       - '127.0.0.1:5432:5432'
     volumes:
       - mood_pgdata:/var/lib/postgresql/data
-      - ./infra/database/001_initial.sql:/docker-entrypoint-initdb.d/001_initial.sql:ro
-      - ./infra/database/002_model_emotions.sql:/docker-entrypoint-initdb.d/002_model_emotions.sql:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
       interval: 5s
       timeout: 3s
       retries: 10
+  migrate:
+    build:
+      context: .
+      dockerfile: infra/backend.Dockerfile
+    command: ['python', '-m', 'app.db.migrate']
+    environment:
+      MOOD_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-mood}:${POSTGRES_PASSWORD:-mood_local_only}@db:5432/${POSTGRES_DB:-mood}
+    depends_on:
+      db:
+        condition: service_healthy
   backend:
     build:
       context: .
@@ -23,11 +31,19 @@ services:
     environment:
       MOOD_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-mood}:${POSTGRES_PASSWORD:-mood_local_only}@db:5432/${POSTGRES_DB:-mood}
       MOOD_AI_SERVICE_TOKEN: ${MOOD_AI_SERVICE_TOKEN:-}
+      MOOD_AI_CONTROL_TOKEN: ${MOOD_AI_CONTROL_TOKEN:-}
+      MOOD_AI_BASE_URL: http://ai:8001
+      MOOD_USER_SESSION_TTL_SECONDS: ${MOOD_USER_SESSION_TTL_SECONDS:-28800}
+      MOOD_WS_TICKET_TTL_SECONDS: ${MOOD_WS_TICKET_TTL_SECONDS:-30}
+      MOOD_AI_MIN_CONFIDENCE: ${MOOD_AI_MIN_CONFIDENCE:-0.5}
+      MOOD_ALLOW_SIMULATED_AI: ${MOOD_ALLOW_SIMULATED_AI:-false}
     ports:
       - '127.0.0.1:8000:8000'
     depends_on:
       db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
   ai:
     build:
       context: .

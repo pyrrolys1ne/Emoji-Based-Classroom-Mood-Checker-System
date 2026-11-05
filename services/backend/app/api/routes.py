@@ -1,10 +1,15 @@
-from datetime import datetime
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from app.core.security import require_ai, require_user
-from app.schemas.contracts import AIResult, EmojiSubmission, Envelope, LoginRequest, PasswordRequest, RegisterRequest, ScheduleRequest
+from app.schemas.contracts import (
+    AIAccepted, AIFiltered, AIResult, AuthSession, ClassSession, EmojiRecord, EmojiSubmission,
+    EmotionStatistics, Envelope, ExportFilters, IdempotencyKey, LoginRequest,
+    PasswordRequest, RecordFilters, RegisterRequest, ScheduleRequest,
+    StatisticsFilters, User,
+)
 from app.services.business import pending
 from app.services.health import readiness
 
@@ -23,12 +28,12 @@ def ready():
     return Envelope(data={"database": "ready"})
 
 
-@router.post("/auth/register", tags=["认证"])
+@router.post("/auth/register", tags=["认证"], response_model=Envelope[None])
 def register(body: RegisterRequest):
     return pending("用户注册")
 
 
-@router.post("/auth/login", tags=["认证"])
+@router.post("/auth/login", tags=["认证"], response_model=Envelope[AuthSession])
 def login(body: LoginRequest):
     return pending("用户登录")
 
@@ -41,17 +46,17 @@ def password(body: PasswordRequest):
     return pending("修改密码")
 
 
-@protected.get("/users/me", tags=["用户"])
+@protected.get("/users/me", tags=["用户"], response_model=Envelope[User])
 def me():
     return pending("当前用户查询")
 
 
-@protected.get("/admin/users", tags=["用户"])
+@protected.get("/admin/users", tags=["用户"], response_model=Envelope[list[User]])
 def users():
     return pending("管理员用户查询")
 
 
-@protected.get("/sessions", tags=["课堂"])
+@protected.get("/sessions", tags=["课堂"], response_model=Envelope[list[ClassSession]])
 def sessions():
     return pending("课堂会话查询")
 
@@ -61,18 +66,18 @@ def schedule(session_id: UUID, body: ScheduleRequest):
     return pending("课堂用户安排")
 
 
-@protected.post("/emoji", tags=["情绪"])
-def emoji(body: EmojiSubmission):
+@protected.post("/emoji", tags=["情绪"], response_model=Envelope[EmojiRecord])
+def emoji(body: EmojiSubmission, idempotency_key: Annotated[IdempotencyKey, Header(alias="Idempotency-Key")]):
     return pending("手动情绪提交")
 
 
-@protected.get("/emoji/history", tags=["情绪"])
-def history(session_id: UUID | None = Query(None, alias="sessionId")):
+@protected.get("/emoji/history", tags=["情绪"], response_model=Envelope[list[EmojiRecord]])
+def history(filters: Annotated[RecordFilters, Query()]):
     return pending("情绪历史查询")
 
 
-@protected.get("/emoji/statistics", tags=["情绪"])
-def statistics(session_id: UUID | None = Query(None, alias="sessionId")):
+@protected.get("/emoji/statistics", tags=["情绪"], response_model=Envelope[EmotionStatistics])
+def statistics(filters: Annotated[StatisticsFilters, Query()]):
     return pending("情绪基础统计")
 
 
@@ -81,18 +86,18 @@ def realtime(session_id: UUID = Query(alias="sessionId")):
     return pending("实时情绪看板")
 
 
-@protected.get("/admin/statistics", tags=["看板"])
-def multidimensional(course: UUID | None = None, class_name: str | None = Query(None, alias="class"), from_time: datetime | None = Query(None, alias="from"), to_time: datetime | None = Query(None, alias="to")):
+@protected.get("/admin/statistics", tags=["看板"], response_model=Envelope[EmotionStatistics])
+def multidimensional(filters: Annotated[StatisticsFilters, Query()]):
     return pending("多维统计")
 
 
 @protected.get("/admin/emoji/export", tags=["导出"])
-def export_csv(format: str = Query("csv", pattern="^csv$")):
+def export_csv(filters: Annotated[ExportFilters, Query()]):
     return pending("服务端 CSV 导出")
 
 
-@router.post("/ai/emoji-results", tags=["AI 入库"], dependencies=[Depends(require_ai)])
-def ai_results(body: AIResult):
+@router.post("/ai/emoji-results", tags=["AI 入库"], dependencies=[Depends(require_ai)], response_model=Envelope[AIAccepted | AIFiltered])
+def ai_results(body: AIResult, idempotency_key: Annotated[IdempotencyKey, Header(alias="Idempotency-Key")]):
     return pending("AI 结果入库")
 
 

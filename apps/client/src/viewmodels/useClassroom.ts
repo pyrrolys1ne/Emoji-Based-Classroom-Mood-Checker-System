@@ -32,6 +32,7 @@ export function useClassroom(
   const [recordsVersion, setRecordsVersion] = useState(0);
   const [now, setNow] = useState(Date.now());
   const mutation = useRef<{ controller: AbortController } | null>(null);
+  const feedback = useRef<{ sessionId: string; emotion: Emotion; requestId: string } | null>(null);
   const token = session.token;
   const teacher = session.user.role === 'TEACHER';
 
@@ -138,6 +139,7 @@ export function useClassroom(
 
   useEffect(() => {
     setSelectedEmotion(null);
+    feedback.current = null;
     setSubmitError('');
     setSubmitNotice('');
     setSubmitting(false);
@@ -157,17 +159,35 @@ export function useClassroom(
   const submit = async () => {
     if (mutation.current || !canSubmit || !selectedEmotion || !selectedSession) return;
     const current = { controller: new AbortController() };
+    if (
+      !feedback.current ||
+      feedback.current.sessionId !== selectedSessionId ||
+      feedback.current.emotion !== selectedEmotion
+    )
+      feedback.current = {
+        sessionId: selectedSessionId,
+        emotion: selectedEmotion,
+        requestId: crypto.randomUUID(),
+      };
     mutation.current = current;
     setSubmitting(true);
     setSubmitError('');
     setSubmitNotice('');
     try {
-      await repository.submit(token, selectedSessionId, selectedEmotion, current.controller.signal);
+      await repository.submit(
+        token,
+        selectedSessionId,
+        selectedEmotion,
+        current.controller.signal,
+        feedback.current.requestId,
+      );
       if (mutation.current !== current) return;
+      feedback.current = null;
       setSelectedEmotion(null);
       setSubmitNotice(repository.mode === 'demo' ? '演示反馈已记录。' : '反馈已保存。');
       retry();
     } catch (error) {
+      if (mutation.current === current && !writeResultIsUnknown(error)) feedback.current = null;
       if (mutation.current === current && !expire(error))
         setSubmitError(
           writeResultIsUnknown(error)
@@ -201,6 +221,7 @@ export function useClassroom(
       if (!mutation.current) setSelectedSessionId(id);
     },
     selectEmotion: (emotion: Emotion) => {
+      if (emotion !== selectedEmotion) feedback.current = null;
       setSelectedEmotion(emotion);
       setSubmitError('');
       setSubmitNotice('');

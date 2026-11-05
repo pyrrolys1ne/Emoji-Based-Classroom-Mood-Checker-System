@@ -1,15 +1,13 @@
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
-from app.core.config import get_settings
+from app.db.session import get_engine
 
 
 def database_available() -> bool:
-    engine = create_engine(get_settings().database_url, connect_args={"connect_timeout": 2})
     try:
-        with engine.connect() as connection:
+        with get_engine().connect() as connection:
             connection.execute(text("SELECT 1"))
         return True
-    except Exception:
+    except SQLAlchemyError:
         return False
-    finally:
-        engine.dispose()

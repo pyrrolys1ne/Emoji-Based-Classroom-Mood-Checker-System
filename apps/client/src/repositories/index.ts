@@ -20,7 +20,13 @@ const user = (x: unknown): x is User =>
   str(x.username) &&
   str(x.email) &&
   ['STUDENT', 'TEACHER', 'ADMIN'].includes(x.role) &&
-  ['ACTIVE', 'DISABLED'].includes(x.status);
+  ['ACTIVE', 'DISABLED'].includes(x.status) &&
+  ['studentNo', 'realName', 'className'].every(
+    (key) => x[key] === undefined || x[key] === null || str(x[key]),
+  ) &&
+  (x.teacherApprovalStatus === undefined ||
+    x.teacherApprovalStatus === null ||
+    ['PENDING', 'APPROVED', 'REJECTED'].includes(x.teacherApprovalStatus));
 const session = (x: unknown): x is ClassSession =>
   obj(x) &&
   ['id', 'courseId', 'courseName', 'teacherName', 'className', 'room'].every((k) => str(x[k])) &&
@@ -54,6 +60,7 @@ const stats = (x: unknown): x is EmotionStatistics =>
   Number.isSafeInteger(x.total) &&
   x.total >= 0 &&
   obj(x.distribution) &&
+  (x.source === undefined || ['MANUAL', 'AI', 'ALL'].includes(x.source)) &&
   keys.every((k) => Number.isSafeInteger(x.distribution[k]) && x.distribution[k] >= 0) &&
   keys.reduce((a, k) => a + x.distribution[k], 0) === x.total;
 const bad = () => new ClientError('服务返回的数据格式无效。', 0, 'INVALID_RESPONSE');
@@ -63,6 +70,12 @@ const cleanUser = (u: User): User => ({
   email: u.email,
   role: u.role,
   status: u.status,
+  ...(u.studentNo !== undefined ? { studentNo: u.studentNo } : {}),
+  ...(u.realName !== undefined ? { realName: u.realName } : {}),
+  ...(u.className !== undefined ? { className: u.className } : {}),
+  ...(u.teacherApprovalStatus !== undefined
+    ? { teacherApprovalStatus: u.teacherApprovalStatus }
+    : {}),
 });
 
 export function createApiRepository(
@@ -76,6 +89,7 @@ export function createApiRepository(
     token?: string,
     body?: unknown,
     signal?: AbortSignal,
+    requestId?: string,
   ): Promise<unknown> {
     const controller = new AbortController();
     let timedOut = false;
@@ -90,6 +104,7 @@ export function createApiRepository(
       const headers: Record<string, string> = {};
       if (token) headers.Authorization = `Bearer ${token}`;
       if (body !== undefined) headers['Content-Type'] = 'application/json';
+      if (requestId) headers['Idempotency-Key'] = requestId;
       const response = await fetcher(base + path, {
         method,
         headers,
@@ -157,7 +172,15 @@ export function createApiRepository(
         '/auth/register',
         'POST',
         undefined,
-        { username: i.username, email: i.email, password: i.password, role: i.role },
+        {
+          username: i.username,
+          email: i.email,
+          password: i.password,
+          role: i.role,
+          ...(i.studentNo !== undefined ? { studentNo: i.studentNo } : {}),
+          ...(i.realName !== undefined ? { realName: i.realName } : {}),
+          ...(i.className !== undefined ? { className: i.className } : {}),
+        },
         s,
       );
     },
@@ -183,8 +206,8 @@ export function createApiRepository(
       if (!Array.isArray(d) || !d.every(session)) throw bad();
       return d;
     },
-    async submit(t, id, e, s) {
-      await request('/emoji', 'POST', t, { sessionId: id, emotion: e }, s);
+    async submit(t, id, e, s, requestId = crypto.randomUUID()) {
+      await request('/emoji', 'POST', t, { sessionId: id, emotion: e }, s, requestId);
     },
     async history(t, id, s) {
       const d = await request(

@@ -61,6 +61,8 @@ npm run dev:client
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r services/backend/requirements-dev.txt
+$env:PYTHONPATH = 'services/backend'
+.\.venv\Scripts\python.exe -m app.db.migrate
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --app-dir services/backend --reload --host 127.0.0.1 --port 8000
 ```
 
@@ -69,7 +71,7 @@ python -m venv .venv
 - Swagger 文档：<http://127.0.0.1:8000/docs>。
 - OpenAPI：<http://127.0.0.1:8000/openapi.json>。
 
-本地配置参考 `services/backend/.env.example`，复制为同目录 `.env` 后修改；配置文件路径独立于启动时所在目录。业务接口统一返回“尚未实现”，不会假装已写入数据库。未携带身份的受保护请求返回 401，任意占位令牌也不会获得用户权限。JWT 与 RBAC 的正式实现位于后端模块。
+本地配置参考 `services/backend/.env.example`，复制为同目录 `.env` 后修改；配置文件路径独立于启动时所在目录。业务接口统一返回“尚未实现”，不会假装已写入数据库。未携带身份的受保护请求返回 401，任意占位令牌也不会获得用户权限。正式会话认证与 RBAC 仍待实现。
 
 AI 服务单独启动：
 
@@ -91,7 +93,7 @@ Copy-Item .env.example .env
 docker compose up --build -d
 ```
 
-前端仍通过 npm 启动。数据库初始脚本为 `infra/database/001_initial.sql`，创建用户、课程、课堂会话、用户安排、情绪记录与审计日志。脚本只在空数据卷初始化时执行，后续变更请新增迁移脚本。未内置管理员账号；管理员初始化流程、密码加盐哈希和授权机制待实现。默认密码仅供本地开发，部署前更换。服务端口均绑定本机回环地址。
+前端仍通过 npm 启动。`migrate` 服务在 PostgreSQL 就绪后按顺序执行 `infra/database/001` 至 `004`，成功后启动后端；已有数据卷使用相同入口升级。迁移记录版本和校验和，兼容由原有三份完整 SQL 初始化的旧库。结构包含用户、课程、课堂、安排、记录、审计、教师审批、登录会话与一次性票据，后续变更新增迁移。用法和配置见 [后端数据库说明](docs/backend-database.md)。未内置管理员账号；管理员初始化流程、密码加盐哈希和授权业务仍待实现。默认密码仅供本地开发，部署前更换。服务端口均绑定本机回环地址。
 
 ## 管理端接入真实 API
 

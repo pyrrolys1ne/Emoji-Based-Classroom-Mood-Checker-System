@@ -67,6 +67,47 @@ describe('API repository', () => {
     await createApiRepository({ fetcher }).submit('token', 'class', 'HAPPY');
     expect(JSON.parse(request!.body as string)).toEqual({ sessionId: 'class', emotion: 'HAPPY' });
     expect((request!.headers as Record<string, string>).Authorization).toBe('Bearer token');
+    expect((request!.headers as Record<string, string>)['Idempotency-Key']).toMatch(
+      /^[a-f0-9-]{36}$/,
+    );
+  });
+  it('preserves a supplied request key across manual retries without automatic replay', async () => {
+    const keys: string[] = [];
+    const repo = createApiRepository({
+      fetcher: (async (_url, init) => {
+        keys.push((init!.headers as Record<string, string>)['Idempotency-Key']);
+        return new Response(JSON.stringify({ code: 'UNAVAILABLE', data: null }), { status: 503 });
+      }) as typeof fetch,
+    });
+    await expect(
+      repo.submit('token', 'class', 'HAPPY', undefined, 'stable-request'),
+    ).rejects.toMatchObject({ status: 503 });
+    expect(keys).toEqual(['stable-request']);
+    await expect(
+      repo.submit('token', 'class', 'HAPPY', undefined, 'stable-request'),
+    ).rejects.toMatchObject({ status: 503 });
+    expect(keys).toEqual(['stable-request', 'stable-request']);
+  });
+  it('preserves validated profile fields but rejects malformed approval state', async () => {
+    const base = {
+      id: 'student',
+      username: 'student',
+      email: 'student@example.edu',
+      role: 'STUDENT',
+      status: 'ACTIVE',
+      studentNo: '20260001',
+      realName: '测试学生',
+      className: '测试班',
+      teacherApprovalStatus: null,
+    };
+    const repository = (data: unknown) =>
+      createApiRepository({
+        fetcher: (async () => new Response(JSON.stringify({ code: 'OK', data }))) as typeof fetch,
+      });
+    expect(await repository(base).me('token')).toEqual(base);
+    await expect(
+      repository({ ...base, teacherApprovalStatus: 'unknown' }).me('token'),
+    ).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
   });
   it('rejects bad shape and error envelopes without exposing backend message', async () => {
     const fetcher = (async () =>

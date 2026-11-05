@@ -1,5 +1,50 @@
 # API 协作草案
 
+## v0.5 后端基础契约
+
+本节覆盖下文相同事项。正式后端已有请求校验、响应模型、数据库模型与迁移；注册、认证、权限、提交、查询、统计和导出业务仍未实现。数据库与配置见 [后端数据库说明](backend-database.md)。
+
+### 账号与角色
+
+`User` 保留 `id`、`username`、`email`、`role`、`status`，新增可选且可空的 `studentNo`、`realName`、`className`、`teacherApprovalStatus`。学号最长 50 字符且非空时唯一，姓名、班级最长 100 字符；旧账号允许为空。学生注册可提交前三项，教师申请只允许附加姓名。现有客户端注册表单仍兼容，资料维护和新增字段展示不表示已实现。
+
+学生自助注册；`role: TEACHER` 表示申请教师身份，不能直接获得教师权限。申请记录状态为 `PENDING`、`APPROVED`、`REJECTED`，与用户的 `ACTIVE`、`DISABLED` 分离。申请者初始角色为 STUDENT，待审核和驳回时不发放登录会话；批准时由管理员在同一事务内授予 TEACHER 并记录审计。旧库已有教师保留授权。首个管理员由受控命令创建，公开注册不能选择 ADMIN。
+
+登录仍返回 `{token,user}`，token 为高熵随机的不透明 Bearer 令牌。允许多设备登录，会话默认 8 小时，可配置；注销撤销当前会话，改密撤销全部会话及关联票据和连接。数据库保存令牌 SHA-256 摘要。上述行为为业务实现约束，当前用户认证仍返回 501。
+
+### 课堂与手动提交
+
+学生仅获取被安排课堂；教师仅获取所授课堂。学生提交时段为服务端时间的 `[startsAt,endsAt)`；允许多次新增记录，不覆盖既有反馈。请求体仍为 `{sessionId,emotion}`，身份、来源 MANUAL 和时间由服务端确定。
+
+手动提交和 AI 入库均要求 `Idempotency-Key`，允许 1—100 个 ASCII 字母、数字及 `._:-`。一次用户操作生成一键；结果未知后重试沿用原键和原载荷，不自动重放写请求。手动键按用户隔离，AI 键按 AI 来源隔离。同键同载荷返回原结果，同键不同载荷返回 409；同一学生主动再次反馈使用新键。手动提交成功 data 为 EmojiRecord，重放返回同一条记录；注册成功 data 为 null。摘要由服务端对已校验、补齐默认值并规范化的请求计算，不接受客户端指定摘要。手动规范化载荷为 sessionId、emotion；AI 为所有已校验请求字段，时间转 UTC、UUID 使用标准形式，JSON 按字段排序后生成 SHA-256。鉴权与当前访问范围仍须校验；新记录需满足提交时段，已完成请求重放可在课堂结束后返回原结果。
+
+缺少或非法幂等键返回 422。客户端 API 仓储已支持该请求头；同页、同账号、同课堂且选择不变的失败重试保留原键，刷新或切换后须先查历史核实。
+
+### 查询与统计
+
+历史、基础统计、多维统计及导出使用 `sessionId`、`userId`、`course`、`class`、`from`、`to`、`source` 过滤；服务端按当前身份进一步限制范围。时间必须带时区，使用 `[from,to)`；`from >= to` 或无时区返回 422。列表 `data` 保持数组，按 recordedAt 倒序、id 倒序稳定排序，不静默截断；分页变更须同步调用方。学生历史固定为本人 MANUAL 记录，不能通过 source 或 userId 扩大范围。
+
+`source` 为 `MANUAL`、`AI`、`ALL`。历史默认 ALL；统计和 CSV 默认 MANUAL，显式 ALL 才合并。统计成功结构冻结为 `{total,distribution,source}`：distribution 包含九种情绪，未出现项为 0，总和等于 total；分母是相同范围和来源的记录数。必须全量聚合，AI 采样记录数不能解释为学生人数。共享类型保留 source 可选以兼容独立联调服务；正式成功响应应包含 source。统计来源切换界面和正式聚合在对应业务实现时接入。
+
+### 新增管理接口约定
+
+以下为已冻结的后续接口，当前尚未注册路由；不能作为已可用接口调用。
+
+| 接口                                                              | 请求与范围                                                                           |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `PUT /api/admin/users/{userId}/student-profile`                   | 管理员维护学生资料；可选 studentNo、realName、className，显式 null 清空，省略保留    |
+| `GET /api/admin/teacher-applications`                             | 管理员查询申请；返回 id、userId、status、submittedAt、reviewedAt、reviewedBy、reason |
+| `PUT /api/admin/teacher-applications/{applicationId}`             | `{decision:"APPROVED"或"REJECTED",reason?}`；只审核 PENDING，同事务更新角色与审计    |
+| `GET /api/admin/courses`                                          | 管理员查询课程，返回 id、name、teacherId                                             |
+| `POST /api/admin/courses`、`PUT /api/admin/courses/{courseId}`    | `{name,teacherId}`；必须是有效且已授予教师身份的用户                                 |
+| `POST /api/admin/sessions`、`PUT /api/admin/sessions/{sessionId}` | `{courseId,startsAt,endsAt,room,className}`；带时区，结束晚于开始                    |
+
+用户角色、有效教师、安排名单及数据范围由业务层在服务端校验。删除课程、删除课堂和新增管理页面不包含在上述接口中。
+
+### 错误语义
+
+统一错误包装不变。401 使用 UNAUTHENTICATED；403 可用 FORBIDDEN、ACCOUNT_DISABLED、TEACHER_APPROVAL_REQUIRED；404 使用 NOT_FOUND；409 可用 CONFLICT、ACCOUNT_EXISTS、STUDENT_NO_EXISTS、CLASSROOM_NOT_OPEN、IDEMPOTENCY_CONFLICT；422 使用 VALIDATION_ERROR；501 使用 NOT_IMPLEMENTED；503 使用 UNAVAILABLE。业务错误码在对应功能实现时启用，当前不伪造业务结果。
+
 ## v0.4 摄像头 API 实验增量
 
 AI 启动模式新增 `camera-api`。该模式要求 `allowRemoteUpload: true`、`sampleIntervalSeconds >= 5`，并使用 `maxSamples`（默认 5，范围 1—60）和 `maxDurationSeconds`（默认 120，范围 10—600）限制实验。到达任一上限停止新采样；正在进行的设备读取或请求结束后退出。错误响应或无效 API 结果停止实验，不自动重试付费推理；结构化入库仍使用原有重试和幂等机制。
@@ -52,7 +97,7 @@ AI 入库新增可选 `inferenceProvider`（`DeepSeek` 或 `DeepFace`）、`conf
 
 JSON 字段使用小驼峰，例如手动提交为 `sessionId`、`emotion`；安排用户为 `userIds`；AI 入库为 `sessionId`、`emotion`、`confidence`、`recordedAt`、`deviceId`、`source`。时间戳须使用带时区的 ISO 8601 格式，来源限定 AI，置信度在零到一之间。当前情绪枚举为 `HAPPY`、`FOCUSED`、`NEUTRAL`、`CONFUSED`、`SAD`，应与共享类型保持一致。
 
-公开注册不能提交 `ADMIN` 角色。教师注册后的角色审批、管理员创建机制和权限矩阵仍需确定。教师必须能访问所授课堂的看板和统计，即使路径包含 `admin` 也应按照实际权限授权。
+公开注册不能提交 `ADMIN` 角色。教师审批与管理员创建规则见 v0.5。教师必须能访问所授课堂的看板和统计，即使路径包含 `admin` 也应按照实际权限授权。
 
 前端 API 适配层暂定列表响应的 `data` 为数组；未来增加分页时需统一改为 `items`、`total` 等结构并同步类型与页面。服务端 CSV 导出和浏览器演示导出是不同实现，正式 CSV 接口仍待开发。
 

@@ -3,6 +3,7 @@ WORKDIR /app
 COPY services/backend/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 COPY services/backend/app ./app
+COPY infra/database /infra/database
 RUN useradd --create-home appuser
 USER appuser
 EXPOSE 8000

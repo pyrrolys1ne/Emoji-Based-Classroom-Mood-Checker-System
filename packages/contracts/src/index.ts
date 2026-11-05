@@ -11,14 +11,77 @@ export const emotions = {
 } as const;
 
 export type Emotion = keyof typeof emotions;
+export type AIEmotion = Exclude<Emotion, 'FOCUSED' | 'CONFUSED'>;
 export type Role = 'STUDENT' | 'TEACHER' | 'ADMIN';
 export type RecordSource = 'MANUAL' | 'AI';
+export type SourceFilter = RecordSource | 'ALL';
+export type TeacherApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+export type UserStatus = 'ACTIVE' | 'DISABLED';
 export interface User {
   id: string;
   username: string;
   email: string;
   role: Role;
-  status: 'ACTIVE' | 'DISABLED';
+  status: UserStatus;
+  studentNo?: string | null;
+  realName?: string | null;
+  className?: string | null;
+  teacherApprovalStatus?: TeacherApprovalStatus | null;
+}
+export interface RegisterRequest {
+  username: string;
+  email: string;
+  password: string;
+  role: 'STUDENT' | 'TEACHER';
+  studentNo?: string | null;
+  realName?: string | null;
+  className?: string | null;
+}
+export interface StudentProfileRequest {
+  studentNo?: string | null;
+  realName?: string | null;
+  className?: string | null;
+}
+export interface TeacherReviewRequest {
+  decision: 'APPROVED' | 'REJECTED';
+  reason?: string | null;
+}
+export interface CourseRequest {
+  name: string;
+  teacherId: string;
+}
+export interface Course extends CourseRequest {
+  id: string;
+}
+export interface TeacherApplication {
+  id: string;
+  userId: string;
+  status: TeacherApprovalStatus;
+  submittedAt: string;
+  reviewedAt: string | null;
+  reviewedBy: string | null;
+  reason: string | null;
+}
+export interface SessionRequest {
+  courseId: string;
+  startsAt: string;
+  endsAt: string;
+  room: string;
+  className: string;
+}
+export interface RecordFilters {
+  sessionId?: string;
+  userId?: string;
+  course?: string;
+  class?: string;
+  from?: string;
+  to?: string;
+  source?: SourceFilter;
+}
+export interface EmotionStatistics {
+  total: number;
+  distribution: Record<Emotion, number>;
+  source?: SourceFilter;
 }
 export interface ClassSession {
   id: string;
@@ -57,6 +120,20 @@ export interface EmojiSubmission {
   sessionId: string;
   emotion: Emotion;
 }
+export interface AIResultRequest {
+  sessionId: string;
+  emotion: AIEmotion;
+  confidence: number;
+  recordedAt: string;
+  deviceId: string;
+  source?: 'AI';
+  simulated?: boolean;
+  inferenceProvider?: 'DeepSeek' | 'DeepFace' | null;
+  confidenceKind?: 'self_reported' | 'model_score' | null;
+}
+export type AIIngestResult =
+  | { accepted: true; created: boolean; record: EmojiRecord }
+  | { accepted: false; reason: 'LOW_CONFIDENCE' };
 
 export interface AuthSession {
   token: string;

@@ -1,4 +1,13 @@
-import type { AuthSession, ClassSession, Emotion, EmojiRecord, User } from '@mood/contracts';
+import type {
+  AuthSession,
+  ClassSession,
+  Emotion,
+  EmojiRecord,
+  User,
+  RegisterRequest,
+  EmotionStatistics,
+} from '@mood/contracts';
+export type { EmotionStatistics } from '@mood/contracts';
 import type { ReactNode } from 'react';
 
 export type DataMode = 'demo' | 'api';
@@ -8,17 +17,10 @@ export interface LoginInput {
   username: string;
   password: string;
 }
-export interface RegisterInput extends LoginInput {
-  email: string;
-  role: 'STUDENT' | 'TEACHER';
-}
+export type RegisterInput = RegisterRequest;
 export interface PasswordInput {
   oldPassword: string;
   newPassword: string;
-}
-export interface EmotionStatistics {
-  total: number;
-  distribution: Record<Emotion, number>;
 }
 
 export class ClientError extends Error {
@@ -40,7 +42,13 @@ export interface ClientRepository {
   logout(token: string, signal?: AbortSignal): Promise<void>;
   changePassword(token: string, input: PasswordInput, signal?: AbortSignal): Promise<void>;
   sessions(token: string, signal?: AbortSignal): Promise<ClassSession[]>;
-  submit(token: string, sessionId: string, emotion: Emotion, signal?: AbortSignal): Promise<void>;
+  submit(
+    token: string,
+    sessionId: string,
+    emotion: Emotion,
+    signal?: AbortSignal,
+    requestId?: string,
+  ): Promise<void>;
   history(token: string, sessionId?: string, signal?: AbortSignal): Promise<EmojiRecord[]>;
   statistics(token: string, sessionId: string, signal?: AbortSignal): Promise<EmotionStatistics>;
 }

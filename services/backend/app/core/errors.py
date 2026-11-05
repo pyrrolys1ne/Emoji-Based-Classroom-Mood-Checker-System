@@ -7,7 +7,7 @@ from starlette.exceptions import HTTPException
 def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(HTTPException)
     async def http_error(_request: Request, exc: HTTPException):
-        codes = {401: "UNAUTHENTICATED", 403: "FORBIDDEN", 404: "NOT_FOUND", 501: "NOT_IMPLEMENTED", 503: "UNAVAILABLE"}
+        codes = {401: "UNAUTHENTICATED", 403: "FORBIDDEN", 404: "NOT_FOUND", 409: "CONFLICT", 422: "VALIDATION_ERROR", 501: "NOT_IMPLEMENTED", 503: "UNAVAILABLE"}
         return JSONResponse(
             status_code=exc.status_code,
             content={"code": codes.get(exc.status_code, "REQUEST_ERROR"), "message": str(exc.detail), "data": None},

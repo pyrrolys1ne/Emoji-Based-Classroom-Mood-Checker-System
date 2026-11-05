@@ -50,7 +50,7 @@ src/__tests__/         组件与应用状态测试
 e2e/                  浏览器流程、响应式、无障碍及受控 HTTP 测试
 ```
 
-共享情绪、User、ClassSession、EmojiRecord、AuthSession 来自 packages/contracts。教师基础统计使用候选的 `{total,distribution}`，要求九种情绪的非负整数分布与 total 一致；正式后端确认后同步合同，不能静默丢字段或用分页历史替代全量统计。
+共享情绪、User、ClassSession、EmojiRecord、AuthSession 和 EmotionStatistics 来自 packages/contracts。正式教师统计为 `{total,distribution,source}`，默认 MANUAL，要求九种情绪的非负整数分布与 total 一致；source 可选以兼容联调服务，不能用分页历史替代全量统计。手动提交通过 Idempotency-Key 区分主动新增与失败重试，业务规则见 API 契约 v0.5。
 
 ## 检查与构建
 

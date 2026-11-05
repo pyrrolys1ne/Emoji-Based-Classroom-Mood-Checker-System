@@ -2,6 +2,8 @@
 
 管理端已有登录适配、课堂安排、历史查询、实时看板、多维统计与 CSV；AI 服务已接通 DeepSeek 图片和摄像头推理、过滤、匿名上报与重试。当前链路使用 `services/integration` 和 SQLite；正式后端 `services/backend` 的业务接口仍为占位，需要补齐后切换到 PostgreSQL。
 
+正式后端已有 SQLAlchemy 实体、连接池与显式事务、顺序 SQL 迁移和真实 PostgreSQL 测试入口。学生资料、教师审核、提交时段、多次反馈、幂等与统计来源规则以 [API 契约 v0.5](api-contract.md) 为准；数据库升级与配置见 [后端数据库说明](backend-database.md)。这些基础不代表业务接口已经开放。
+
 ## 后端需要完成的工作
 
 | 优先级 | 工作与接口                                                                      | 关键要求                                                                                                        |
