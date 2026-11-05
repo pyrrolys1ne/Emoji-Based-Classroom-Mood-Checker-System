@@ -133,8 +133,21 @@ export function createApiRepository(
           501: '此功能尚未开放。',
           503: '服务暂时不可用。',
         };
+        const accountMessages: Record<string, { status: number; message: string }> = {
+          TEACHER_APPROVAL_REQUIRED: {
+            status: 403,
+            message: '教师申请尚未获准，请等待审核或联系管理员。',
+          },
+          ACCOUNT_DISABLED: { status: 403, message: '账号已禁用，请联系管理员。' },
+          INVALID_PASSWORD: { status: 403, message: '原密码错误，请重新输入。' },
+          ACCOUNT_EXISTS: { status: 409, message: '用户名或邮箱已被使用。' },
+          STUDENT_NO_EXISTS: { status: 409, message: '学号已被使用，请联系管理员核对。' },
+        };
+        const accountError = accountMessages[envelope.code];
         throw new ClientError(
-          messages[response.status] ?? '操作未能完成，请稍后重试。',
+          accountError?.status === response.status
+            ? accountError.message
+            : (messages[response.status] ?? '操作未能完成，请稍后重试。'),
           response.status,
           /^[A-Z0-9_]{1,80}$/.test(envelope.code) ? envelope.code : 'REQUEST_FAILED',
         );

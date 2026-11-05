@@ -18,8 +18,8 @@ def test_health_and_openapi():
 def test_protected_api_rejects_missing_and_unverified_identity():
     assert client.get("/api/admin/users").status_code == 401
     response = client.get("/api/admin/users", headers={"Authorization": "Bearer fake-token"})
-    assert response.status_code == 501
-    assert response.json()["code"] == "NOT_IMPLEMENTED"
+    assert response.status_code == 401
+    assert response.json()["code"] == "UNAUTHENTICATED"
 
 
 def test_public_register_cannot_create_admin_and_never_echoes_password():
@@ -28,8 +28,10 @@ def test_public_register_cannot_create_admin_and_never_echoes_password():
     assert "private-password" not in response.text
 
 
-def test_valid_login_is_explicitly_unimplemented():
-    assert client.post("/api/auth/login", json={"username": "student", "password": "private-password"}).status_code == 501
+def test_login_validates_bounds_without_echoing_password():
+    response = client.post("/api/auth/login", json={"username": "", "password": "private-password"})
+    assert response.status_code == 422
+    assert "private-password" not in response.text
 
 
 def test_ai_token_and_payload_validation(monkeypatch):

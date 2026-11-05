@@ -1,7 +1,15 @@
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import InterfaceError, OperationalError
 from starlette.exceptions import HTTPException
+
+
+class ApiError(HTTPException):
+    def __init__(self, status_code: int, code: str, message: str):
+        headers = {"WWW-Authenticate": "Bearer"} if status_code == 401 else None
+        super().__init__(status_code, message, headers=headers)
+        self.code = code
 
 
 def install_error_handlers(app: FastAPI) -> None:
@@ -10,15 +18,20 @@ def install_error_handlers(app: FastAPI) -> None:
         codes = {401: "UNAUTHENTICATED", 403: "FORBIDDEN", 404: "NOT_FOUND", 409: "CONFLICT", 422: "VALIDATION_ERROR", 501: "NOT_IMPLEMENTED", 503: "UNAVAILABLE"}
         return JSONResponse(
             status_code=exc.status_code,
-            content={"code": codes.get(exc.status_code, "REQUEST_ERROR"), "message": str(exc.detail), "data": None},
-            headers=exc.headers,
+            content={"code": getattr(exc, "code", codes.get(exc.status_code, "REQUEST_ERROR")), "message": str(exc.detail), "data": None},
+            headers={**(exc.headers or {}), "Cache-Control": "no-store"},
         )
+
+    @app.exception_handler(OperationalError)
+    @app.exception_handler(InterfaceError)
+    async def database_error(_request: Request, _exc: Exception):
+        return JSONResponse(status_code=503, content={"code": "UNAVAILABLE", "message": "数据库暂时不可用。", "data": None}, headers={"Cache-Control": "no-store"})
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(_request: Request, _exc: RequestValidationError):
         # 不回显输入值，避免密码和令牌出现在错误响应中。
-        return JSONResponse(status_code=422, content={"code": "VALIDATION_ERROR", "message": "请求参数不符合接口契约，请查看 /docs。", "data": None})
+        return JSONResponse(status_code=422, content={"code": "VALIDATION_ERROR", "message": "请求参数不符合接口契约，请查看 /docs。", "data": None}, headers={"Cache-Control": "no-store"})
 
     @app.exception_handler(Exception)
     async def unexpected_error(_request: Request, _exc: Exception):
-        return JSONResponse(status_code=500, content={"code": "INTERNAL_ERROR", "message": "服务内部错误。", "data": None})
+        return JSONResponse(status_code=500, content={"code": "INTERNAL_ERROR", "message": "服务内部错误。", "data": None}, headers={"Cache-Control": "no-store"})

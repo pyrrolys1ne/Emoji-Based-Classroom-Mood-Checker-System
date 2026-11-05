@@ -16,6 +16,7 @@ class Contract(BaseModel):
 
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
 StudentNo = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=50)]
+Username = Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=50)]
 IdempotencyKey = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9._:-]{1,100}$")]
 AIEmotion = Literal[
     Emotion.HAPPY, Emotion.NEUTRAL, Emotion.SAD, Emotion.ANGRY,
@@ -30,9 +31,9 @@ class SourceFilter(StrEnum):
 
 
 class RegisterRequest(Contract):
-    username: Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=50)]
+    username: Username
     email: EmailStr = Field(max_length=254)
-    password: str = Field(min_length=8, max_length=128)
+    password: str = Field(min_length=8, max_length=128, repr=False, json_schema_extra={"format": "password", "writeOnly": True})
     # 管理员创建走后续受控流程，禁止公开注册时自选管理员。
     role: Literal["STUDENT", "TEACHER"] = "STUDENT"
     student_no: StudentNo | None = None
@@ -47,13 +48,26 @@ class RegisterRequest(Contract):
 
 
 class LoginRequest(Contract):
-    username: str
-    password: str
+    username: Username
+    password: str = Field(min_length=1, max_length=128, repr=False, json_schema_extra={"format": "password", "writeOnly": True})
 
 
 class PasswordRequest(Contract):
-    old_password: str
-    new_password: str = Field(min_length=8, max_length=128)
+    old_password: str = Field(min_length=1, max_length=128, repr=False, json_schema_extra={"format": "password", "writeOnly": True})
+    new_password: str = Field(min_length=8, max_length=128, repr=False, json_schema_extra={"format": "password", "writeOnly": True})
+
+    @model_validator(mode="after")
+    def changed_password(self):
+        if self.old_password == self.new_password:
+            raise ValueError("新密码不能与原密码相同")
+        return self
+
+
+class AdminBootstrapRequest(Contract):
+    username: Username
+    email: EmailStr = Field(max_length=254)
+    password: str = Field(min_length=8, max_length=128, repr=False)
+    real_name: Name | None = None
 
 
 class EmojiSubmission(Contract):
@@ -167,7 +181,7 @@ class User(Contract):
 
 
 class AuthSession(Contract):
-    token: str
+    token: str = Field(repr=False)
     user: User
 
 

@@ -56,6 +56,8 @@ class Settings(BaseSettings):
         control = self.ai_control_token.get_secret_value()
         if service and control and service == control:
             raise ValueError("AI 入库令牌和 AI 控制令牌必须独立")
+        if service.startswith("usr_") or control.startswith("usr_"):
+            raise ValueError("AI 服务令牌不能使用用户令牌保留前缀 usr_")
         return self
 
 

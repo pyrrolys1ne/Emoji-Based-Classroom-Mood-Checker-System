@@ -179,6 +179,23 @@ it('serializes concurrent writes across repositories sharing storage', async () 
 });
 
 describe('API boundary coverage', () => {
+  it.each([
+    [403, 'TEACHER_APPROVAL_REQUIRED', '教师申请尚未获准'],
+    [403, 'ACCOUNT_DISABLED', '账号已禁用'],
+    [403, 'INVALID_PASSWORD', '原密码错误'],
+    [409, 'ACCOUNT_EXISTS', '用户名或邮箱已被使用'],
+    [409, 'STUDENT_NO_EXISTS', '学号已被使用'],
+  ])('maps account status %i and code %s to a bounded message', async (status, code, message) => {
+    const repo = createApiRepository({
+      fetcher: (async () =>
+        new Response(JSON.stringify({ code, message: 'private server detail', data: null }), {
+          status,
+        })) as typeof fetch,
+    });
+    await expect(
+      repo.login({ username: 'student', password: 'synthetic-password' }),
+    ).rejects.toMatchObject({ status, code, message: expect.stringContaining(message) });
+  });
   const user = {
     id: 'u',
     username: 'student',

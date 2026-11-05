@@ -5,21 +5,26 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from app.core.config import Settings
-from app.core.security import require_user
+from app.core.security import require_student, require_user
+from app.core.domain import Role, UserStatus
 from app.db.migrate import MigrationError, load_migrations
 from app.main import app
-from app.schemas.contracts import AIResult, Emotion, EmotionStatistics, RegisterRequest, SessionRequest, StatisticsFilters
+from app.schemas.contracts import AIResult, Emotion, EmotionStatistics, RegisterRequest, SessionRequest, StatisticsFilters, User
+from app.services.accounts import Principal
 
 
 @pytest.fixture
 def authorized_contract_client():
-    # 仅越过尚未实现的身份依赖验证参数合同，不代表权限验收。
-    app.dependency_overrides[require_user] = lambda: None
+    # 参数合同测试使用独立身份替身，真实认证与权限由 PostgreSQL 接口测试覆盖。
+    user = User(id=uuid4(), username="admin", email="admin@example.edu", role=Role.ADMIN, status=UserStatus.ACTIVE)
+    app.dependency_overrides[require_user] = lambda: Principal(user, uuid4())
+    app.dependency_overrides[require_student] = lambda: Principal(user, uuid4())
     try:
         with TestClient(app) as client:
             yield client
     finally:
         app.dependency_overrides.pop(require_user, None)
+        app.dependency_overrides.pop(require_student, None)
 
 
 def test_identity_fields_and_teacher_application_input():
