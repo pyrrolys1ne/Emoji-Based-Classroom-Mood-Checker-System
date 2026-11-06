@@ -84,7 +84,7 @@ export interface EmotionStatistics {
   distribution: Record<Emotion, number>;
   source?: SourceFilter;
 }
-export interface ClassSession {
+export interface ClassroomSummary {
   id: string;
   courseId: string;
   courseName: string;
@@ -94,6 +94,8 @@ export interface ClassSession {
   room: string;
   startsAt: string;
   endsAt: string;
+}
+export interface ClassSession extends ClassroomSummary {
   scheduledUserIds: string[];
   scheduledStudents?: ClassroomStudent[];
 }
@@ -116,6 +118,8 @@ export interface EmojiRecord {
   simulated?: boolean;
   inferenceProvider?: 'DeepSeek' | 'DeepFace' | null;
   confidenceKind?: 'self_reported' | 'model_score' | null;
+  classroom?: ClassroomSummary | null;
+  student?: ClassroomStudent | null;
 }
 export interface WorkspaceData {
   users: User[];

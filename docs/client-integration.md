@@ -2,23 +2,23 @@
 
 客户端负责学生账号、课堂选择、手动反馈、个人历史，以及教师所授课堂和相关学生历史与基础统计。实时看板、多维统计、CSV 和用户安排由管理端提供，AI 控制不属于客户端。
 
-本约定补充 [客户端任务交接](client-handoff.md)，正式共享合同以 [API 契约](api-contract.md) v0.7、共享类型和实际 OpenAPI 为准。正式后端账号、会话、教师审批和课堂查询已可用；反馈、历史和统计仍为占位，新增请求模型和数据库结构不代表对应业务可用。
+本约定补充 [客户端任务交接](client-handoff.md)，正式共享合同以 [API 契约](api-contract.md) v0.8、共享类型和实际 OpenAPI 为准。正式后端账号、会话、教师审批、课堂查询、手动反馈和授权历史已可用；基础统计仍返回 501。反馈时段、幂等与查询规则见 [手动反馈与历史](backend-feedback.md)。
 
 ## 接口范围
 
 JSON 采用小驼峰，受保护接口携带 Bearer 令牌，注册和登录不要求已有令牌；响应为 `{code,message,data}`，成功 `code: "OK"`，错误按 HTTP 状态和业务码处理。客户端不公开注册管理员，不读取全局用户目录。
 
-| 接口                                    | 已知请求或数据                                                       | 客户端处理与业务约定                                                                               |
-| --------------------------------------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| POST /api/auth/register                 | username、email、password、role；可选 studentNo、realName、className | 学生自助注册；教师仅申请身份，管理员审核通过后才能登录；教师申请只允许附加姓名                     |
-| POST /api/auth/login                    | username、password；成功 data 为 `{token,user}`                      | 使用共享 AuthSession／User；明确过期、禁用和教师待审核行为                                         |
-| GET /api/users/me                       | 当前身份，User                                                       | 恢复登录并检查角色；失效后清理登录态和个人数据                                                     |
-| PUT /api/auth/password                  | oldPassword、newPassword                                             | 成功只依赖 OK；撤销全部用户会话，重新登录                                                          |
-| POST /api/auth/logout                   | 当前用户认证                                                         | 撤销当前会话；客户端清理数据并中止旧请求；网络失败时提示服务端注销未确认                           |
-| GET /api/sessions                       | 当前用户可访问课堂，列表 data 为数组                                 | 学生按安排名单、教师按任课范围；正式字段见共享 ClassSession，提交使用服务端课堂时段                |
-| POST /api/emoji                         | 仅 `{sessionId,emotion}`                                             | 后端确定 userId、MANUAL 和记录时间；提交成功需已持久化；成功后重新读历史，不依赖未约定的写响应字段 |
-| GET /api/emoji/history?sessionId=...    | 当前身份可见历史，列表 data 为数组                                   | 学生仅本人手动记录；教师仅所授课堂；按 recordedAt、id 倒序，不静默截断                             |
-| GET /api/emoji/statistics?sessionId=... | 教师当前课堂基础统计                                                 | 默认 MANUAL；正式成功结构为 {total,distribution,source}，分布含九种情绪                            |
+| 接口                                    | 已知请求或数据                                                       | 客户端处理与业务约定                                                                                          |
+| --------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| POST /api/auth/register                 | username、email、password、role；可选 studentNo、realName、className | 学生自助注册；教师仅申请身份，管理员审核通过后才能登录；教师申请只允许附加姓名                                |
+| POST /api/auth/login                    | username、password；成功 data 为 `{token,user}`                      | 使用共享 AuthSession／User；明确过期、禁用和教师待审核行为                                                    |
+| GET /api/users/me                       | 当前身份，User                                                       | 恢复登录并检查角色；失效后清理登录态和个人数据                                                                |
+| PUT /api/auth/password                  | oldPassword、newPassword                                             | 成功只依赖 OK；撤销全部用户会话，重新登录                                                                     |
+| POST /api/auth/logout                   | 当前用户认证                                                         | 撤销当前会话；客户端清理数据并中止旧请求；网络失败时提示服务端注销未确认                                      |
+| GET /api/sessions                       | 当前用户可访问课堂，列表 data 为数组                                 | 学生按安排名单、教师按任课范围；正式字段见共享 ClassSession，提交使用服务端课堂时段                           |
+| POST /api/emoji                         | 仅 `{sessionId,emotion}`                                             | 后端确定 userId、MANUAL 和记录时间；提交成功需已持久化；校验有效 EmojiRecord 回执与提交一致，成功后重新读历史 |
+| GET /api/emoji/history?sessionId=...    | 当前身份可见历史，列表 data 为数组                                   | 学生仅本人手动记录；教师仅所授课堂；按 recordedAt、id 倒序，不静默截断                                        |
+| GET /api/emoji/statistics?sessionId=... | 教师当前课堂基础统计                                                 | 默认 MANUAL；正式成功结构为 {total,distribution,source}，分布含九种情绪                                       |
 
 公开注册的用户名长度为 2–50，密码为 8–128；邮箱格式由服务端校验，重复账号按 409 处理。TEACHER 表示申请，待审核或驳回时不发放登录会话；管理员审核批准后才授予教师角色。
 
@@ -49,7 +49,7 @@ JSON 采用小驼峰，受保护接口携带 Bearer 令牌，注册和登录不�
 
 基础统计冻结为 `{total:number,distribution:Record<Emotion,number>,source:"MANUAL"|"AI"|"ALL"}`，完整列出九种情绪并以零表示无记录；分母为相同范围和来源的记录条数。共享类型 source 可选以兼容独立联调服务，正式成功响应包含 source；业务接口仍待实现。API 适配保留新增学生字段，并发送手动幂等请求头；资料输入页面与统计来源切换界面尚未接入。
 
-课堂响应增加实际 teacherId 和 scheduledStudents 摘要，后者包含 id、username、studentNo、realName、className、status，不含邮箱或凭据。教师按实际任课人获取课堂及授权名单，学生响应仅包含本人安排。新增字段在共享类型中可选以兼容演示和联调数据，正式后端均返回；API 仓储校验名单与 scheduledUserIds 一致。教师按学生查看历史时，匿名 AI 单独标识，记录接口仍待实现。
+课堂响应增加实际 teacherId 和 scheduledStudents 摘要，后者包含 id、username、studentNo、realName、className、status，不含邮箱或凭据。教师按实际任课人获取课堂及授权名单，学生响应仅包含本人安排。新增字段在共享类型中可选以兼容演示和联调数据，正式后端均返回；API 仓储校验名单与 scheduledUserIds 一致。正式记录附带 classroom 和 student 摘要；名单移除后仍能展示历史课堂和相关学生，AI 的 student 为 null。共享摘要字段可选以兼容演示和联调服务，API 仓储校验摘要编号与记录一致；教师按学生查看历史时，匿名 AI 单独标识。
 
 ## 错误与数据一致性
 

@@ -2,6 +2,16 @@
 import { createApiRepository, createDemoRepository } from './index';
 import { ClientError } from '../models/client';
 
+const savedRecord = (sessionId: string) => ({
+  id: 'record',
+  sessionId,
+  userId: 'student',
+  emotion: 'HAPPY',
+  source: 'MANUAL',
+  confidence: null,
+  recordedAt: '2026-11-06T02:00:00Z',
+});
+
 function memory(): Storage {
   const m = new Map<string, string>();
   return {
@@ -62,7 +72,9 @@ describe('API repository', () => {
     let request: RequestInit | undefined;
     const fetcher = (async (_: RequestInfo | URL, init?: RequestInit) => {
       request = init;
-      return new Response(JSON.stringify({ code: 'OK', data: null }), { status: 200 });
+      return new Response(JSON.stringify({ code: 'OK', data: savedRecord('class') }), {
+        status: 200,
+      });
     }) as typeof fetch;
     await createApiRepository({ fetcher }).submit('token', 'class', 'HAPPY');
     expect(JSON.parse(request!.body as string)).toEqual({ sessionId: 'class', emotion: 'HAPPY' });
@@ -267,7 +279,9 @@ describe('API boundary coverage', () => {
               ? { total: 0, distribution }
               : p.endsWith('/sessions') || p.includes('/history')
                 ? []
-                : null,
+                : p.endsWith('/emoji')
+                  ? savedRecord('a/b')
+                  : null,
       );
     }) as typeof fetch;
     const repo = createApiRepository({ baseUrl: '/api/', fetcher });

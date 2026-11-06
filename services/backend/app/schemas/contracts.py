@@ -251,7 +251,7 @@ class ClassroomStudent(Contract):
     status: UserStatus
 
 
-class ClassSession(Contract):
+class ClassroomSummary(Contract):
     id: UUID
     course_id: UUID
     course_name: str
@@ -261,6 +261,9 @@ class ClassSession(Contract):
     room: str
     starts_at: AwareDatetime
     ends_at: AwareDatetime
+
+
+class ClassSession(ClassroomSummary):
     scheduled_user_ids: list[UUID]
     scheduled_students: list[ClassroomStudent] = Field(default_factory=list)
 
@@ -276,6 +279,8 @@ class EmojiRecord(Contract):
     simulated: bool = False
     inference_provider: Literal["DeepSeek", "DeepFace"] | None = None
     confidence_kind: Literal["self_reported", "model_score"] | None = None
+    classroom: ClassroomSummary | None = None
+    student: ClassroomStudent | None = None
 
 
 class EmotionStatistics(Contract):

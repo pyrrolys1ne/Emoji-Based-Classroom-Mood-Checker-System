@@ -16,38 +16,11 @@ from app.core.domain import Role, UserStatus
 from app.core.passwords import hash_password
 from app.core.errors import ApiError
 from app.db.models import AppUser, AuditLog, ClassSession, ClassroomImport, Course, EmojiRecord, ScheduleUser
-from app.schemas.contracts import AdminBootstrapRequest, ClassroomSeedRequest, LoginRequest
-from app.services import accounts, classrooms
+from app.schemas.contracts import ClassroomSeedRequest, LoginRequest
+from app.services import classrooms
 
 PASSWORD = "synthetic-password-2026"
 ROOT = Path(__file__).resolve().parents[3]
-
-
-@pytest.fixture
-def actors(api):
-    client, factory, database = api
-    accounts.bootstrap_admin(AdminBootstrapRequest(username="admin", email="admin@example.edu", password=PASSWORD))
-    headers, users = {}, {}
-
-    def login(name):
-        response = client.post("/api/auth/login", json={"username": name, "password": PASSWORD})
-        assert response.status_code == 200, response.text
-        data = response.json()["data"]
-        headers[name] = {"Authorization": "Bearer " + data["token"]}
-        users[name] = data["user"]
-
-    login("admin")
-    for name, role in [("teacher-a", "TEACHER"), ("teacher-b", "TEACHER"), ("student-a", "STUDENT"), ("student-b", "STUDENT")]:
-        body = {"username": name, "email": name + "@example.edu", "password": PASSWORD, "role": role, "realName": name + "姓名"}
-        if role == "STUDENT":
-            body.update(studentNo="20260001" if name.endswith("a") else "20260002", className="测试班")
-        assert client.post("/api/auth/register", json=body).status_code == 200
-    applications = client.get("/api/admin/teacher-applications", headers=headers["admin"]).json()["data"]
-    for application in applications:
-        assert client.put(f"/api/admin/teacher-applications/{application['id']}", headers=headers["admin"], json={"decision": "APPROVED"}).status_code == 200
-    for name in ("teacher-a", "teacher-b", "student-a", "student-b"):
-        login(name)
-    return {"client": client, "factory": factory, "database": database, "headers": headers, "users": users}
 
 
 def create_course(data, teacher="teacher-a", name="软件工程"):

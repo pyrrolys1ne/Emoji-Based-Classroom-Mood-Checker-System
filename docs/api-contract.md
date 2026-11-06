@@ -1,5 +1,17 @@
 # API 协作草案
 
+## v0.8 手动反馈与授权历史
+
+正式后端已实现 `POST /api/emoji` 和 `GET /api/emoji/history`；成功响应在事务提交后返回，接口示例见 [手动反馈与历史](backend-feedback.md)。本节覆盖较旧版本的反馈与历史实现状态，统计、导出、实时和 AI 入库仍未开放。
+
+- 手动提交仅限启用且具备有效会话的学生。请求体仅 `{sessionId,emotion}`，九种情绪均允许；身份、MANUAL 来源、UTC 记录时间由服务端确定。新记录必须属于当前名单且满足 `[startsAt,endsAt)`；等待用户或课堂锁后重新采样服务端时间。不存在课堂返回 404，无安排返回 403，时段外返回 409 CLASSROOM_NOT_OPEN。
+- `Idempotency-Key` 必填，按学生和 MANUAL 来源唯一。同键同规范化载荷返回同一记录，同键不同课堂或情绪返回 409 IDEMPOTENCY_CONFLICT；新键产生新记录。成功重放不增加记录或审计，允许在课堂结束或移出名单后读取原记录，仍须有效学生身份。反馈和 EMOJI_MANUAL_SUBMIT 审计原子提交，失败回滚；键与 SHA-256 请求摘要不进入公开响应。
+- 历史支持 `sessionId,userId,course,class,from,to,source`；默认 ALL，按记录时间倒序、编号倒序返回完整数组，不静默截断。时间必须带时区，采用 `[from,to)`。未知参数、非法 UUID、非法来源或无效时间范围返回 422。响应时间统一 UTC。
+- 学生历史固定为本人 MANUAL；显式查询其他 userId 或 AI 返回 403。教师限定课堂实际 teacherId，管理员全量；筛选与身份范围取交集。显式 sessionId 不存在返回 404，越权返回 403；学生当前被安排或已有本人手动记录即可查询该课堂的本人历史。移出名单不删除历史，也不重新允许新增。
+- EmojiRecord 增加 `classroom` 与 `student` 摘要。classroom 为 `{id,courseId,courseName,teacherId,teacherName,className,room,startsAt,endsAt}`，不含名单；student 为 `{id,username,studentNo,realName,className,status}`，AI 为 null。正式响应总是返回摘要，按当前授权范围读取当前资料；重放保证记录编号、时间、内容一致，不冻结后续资料更正。共享 TypeScript 字段可选以兼容演示和联调数据。
+- AI 历史保持匿名和原有提供方、自评分类型，不归属个人；默认隐藏 simulated 记录，仅隔离环境允许显式配置纳入并保持标记。读取已有 AI 数据不表示 AI 入库已实现。客户端校验手动成功回执与提交一致，成功后刷新历史；无效回执视为结果未知并保留重试键，不能显示保存成功。
+- 反馈、历史成功及错误响应均设 `Cache-Control: no-store`。退出、改密及账号状态变化继续作用于反馈和历史，持久化记录及幂等键在服务重启后保留。
+
 ## v0.7 课程课堂与学生安排
 
 正式后端已实现课程查询与创建修改、课堂创建修改、学生资料维护、名单替换和按角色过滤的课堂查询，接口与初始化文件见 [课程课堂说明](backend-classrooms.md)。成功列表为数组，写操作在数据库及审计提交后返回成功。
@@ -16,7 +28,7 @@ TypeScript 的新增课堂字段保持可选，以兼容演示和独立联调服
 
 ## v0.6 账号与权限
 
-正式后端已实现注册、登录、改密、注销、本人信息、管理员用户目录、教师申请查询与审核；实现和运行方法见 [账号认证与教师审批](backend-auth.md)。JSON 与共享 User、AuthSession、TeacherApplication 类型保持一致，成功响应及错误均为统一包装。与本节重复的业务状态以 v0.7 为准。
+正式后端已实现注册、登录、改密、注销、本人信息、管理员用户目录、教师申请查询与审核；实现和运行方法见 [账号认证与教师审批](backend-auth.md)。JSON 与共享 User、AuthSession、TeacherApplication 类型保持一致，成功响应及错误均为统一包装。与本节重复的业务状态以最新版本为准。
 
 - 注册、改密和注销成功 data 为 null；登录成功为 `{token,user}`；本人信息为 User；目录为 User 数组；申请查询为 TeacherApplication 数组，审核返回更新后的 TeacherApplication。
 - 公开 TEACHER 注册创建 STUDENT 用户与 PENDING 申请，不发放会话；待审核或驳回不能登录。管理员只能批准或驳回 PENDING，批准原子授予 TEACHER；不能通过请求授予 ADMIN。重复审核返回 409 CONFLICT。

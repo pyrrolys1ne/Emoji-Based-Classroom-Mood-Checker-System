@@ -242,8 +242,8 @@ def test_student_role_cannot_use_management_and_unimplemented_business_stays_pen
     assert client.post(f"/api/admin/sessions/{uuid4()}/schedule", headers=student, json={"userIds": []}).status_code == 403
     response = client.get("/api/sessions", headers=student)
     assert response.status_code == 200 and response.json()["data"] == []
-    assert client.post("/api/emoji", headers={**student, "Idempotency-Key": "event"}, json={"sessionId": str(uuid4()), "emotion": "HAPPY"}).status_code == 501
-    assert client.get("/api/emoji/history", headers=student).status_code == 501
+    assert client.post("/api/emoji", headers={**student, "Idempotency-Key": "event"}, json={"sessionId": str(uuid4()), "emotion": "HAPPY"}).status_code == 404
+    assert client.get("/api/emoji/history", headers=student).json()["data"] == []
 
 
 def test_session_persistence_across_client_lifespans(auth):

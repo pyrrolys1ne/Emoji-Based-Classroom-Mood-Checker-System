@@ -5,11 +5,12 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from app.api.accounts import router as accounts_router
 from app.api.classrooms import router as classrooms_router
-from app.core.security import require_admin, require_ai, require_student, require_teacher_or_admin, require_user
+from app.api.feedback import router as feedback_router
+from app.core.security import require_admin, require_ai, require_teacher_or_admin, require_user
 from app.schemas.contracts import (
-    AIAccepted, AIFiltered, AIResult, EmojiRecord, EmojiSubmission,
+    AIAccepted, AIFiltered, AIResult,
     EmotionStatistics, Envelope, ExportFilters, IdempotencyKey,
-    RecordFilters, StatisticsFilters,
+    StatisticsFilters,
 )
 from app.services.business import pending
 from app.services.health import readiness
@@ -19,7 +20,7 @@ router = APIRouter(prefix="/api")
 
 @router.get("/health", tags=["运行状态"], response_model=Envelope[dict[str, str]])
 def health():
-    return Envelope(data={"status": "ok", "version": "0.1.0", "stage": "classrooms"})
+    return Envelope(data={"status": "ok", "version": "0.1.0", "stage": "feedback"})
 
 
 @router.get("/ready", tags=["运行状态"], response_model=Envelope[dict[str, str]])
@@ -30,16 +31,6 @@ def ready():
 
 
 protected = APIRouter(dependencies=[Depends(require_user)])
-
-
-@protected.post("/emoji", tags=["情绪"], response_model=Envelope[EmojiRecord], dependencies=[Depends(require_student)])
-def emoji(body: EmojiSubmission, idempotency_key: Annotated[IdempotencyKey, Header(alias="Idempotency-Key")]):
-    return pending("手动情绪提交")
-
-
-@protected.get("/emoji/history", tags=["情绪"], response_model=Envelope[list[EmojiRecord]])
-def history(filters: Annotated[RecordFilters, Query()]):
-    return pending("情绪历史查询")
 
 
 @protected.get("/emoji/statistics", tags=["情绪"], response_model=Envelope[EmotionStatistics], dependencies=[Depends(require_teacher_or_admin)])
@@ -70,3 +61,4 @@ def ai_results(body: AIResult, idempotency_key: Annotated[IdempotencyKey, Header
 router.include_router(protected)
 router.include_router(accounts_router)
 router.include_router(classrooms_router)
+router.include_router(feedback_router)

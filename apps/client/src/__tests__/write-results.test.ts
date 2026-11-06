@@ -4,6 +4,8 @@ import { writeResultIsUnknown } from '../models/client';
 
 describe('write result certainty', () => {
   it.each([
+    [200, { code: 'OK', data: null }, true],
+    [200, { code: 'OK', data: { id: 'placeholder' } }, true],
     [200, 'not-json', true],
     [200, { code: 'ERROR', data: null }, true],
     [502, { code: 'UNAVAILABLE', data: null }, true],
@@ -23,5 +25,34 @@ describe('write result certainty', () => {
     } catch (error) {
       expect(writeResultIsUnknown(error)).toBe(unknown);
     }
+  });
+
+  it.each([
+    { sessionId: 'another-classroom' },
+    { emotion: 'SAD' },
+    { source: 'AI' },
+    { userId: null },
+    { confidence: 0.9 },
+    { simulated: true },
+    { inferenceProvider: 'DeepSeek', confidenceKind: 'self_reported' },
+    { student: { id: 'unrelated-student' } },
+  ])('keeps an inconsistent success receipt uncertain: %j', async (change) => {
+    const sessionId = '11111111-1111-4111-8111-111111111111';
+    const data = {
+      id: 'saved-record',
+      userId: 'student',
+      sessionId,
+      emotion: 'HAPPY',
+      source: 'MANUAL',
+      confidence: null,
+      recordedAt: '2026-11-06T02:00:00Z',
+      ...change,
+    };
+    const repo = createApiRepository({
+      fetcher: (async () => new Response(JSON.stringify({ code: 'OK', data }))) as typeof fetch,
+    });
+    await expect(repo.submit('token', sessionId, 'HAPPY')).rejects.toMatchObject({
+      code: 'INVALID_RESPONSE',
+    });
   });
 });

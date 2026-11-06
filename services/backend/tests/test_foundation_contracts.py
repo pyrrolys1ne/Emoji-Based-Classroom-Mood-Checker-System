@@ -52,7 +52,7 @@ def test_classroom_and_statistics_time_contract():
         EmotionStatistics(total=1, distribution=distribution)
 
 
-@pytest.mark.parametrize("path", ["/api/emoji/history", "/api/emoji/statistics", "/api/admin/statistics", "/api/admin/emoji/export"])
+@pytest.mark.parametrize("path", ["/api/emoji/statistics", "/api/admin/statistics", "/api/admin/emoji/export"])
 def test_query_validation_is_exposed_but_business_stays_pending(authorized_contract_client, path):
     assert authorized_contract_client.get(path).status_code == 501
     for params in ({"source": "unknown"}, {"from": "2026-11-06T10:00:00"}, {"from": "2026-11-07T00:00:00Z", "to": "2026-11-06T00:00:00Z"}):
@@ -62,7 +62,8 @@ def test_query_validation_is_exposed_but_business_stays_pending(authorized_contr
 def test_manual_idempotency_header_and_cors(authorized_contract_client):
     payload = {"sessionId": str(uuid4()), "emotion": "FOCUSED"}
     assert authorized_contract_client.post("/api/emoji", json=payload).status_code == 422
-    assert authorized_contract_client.post("/api/emoji", json=payload, headers={"Idempotency-Key": "manual-event"}).status_code == 501
+    parameters = authorized_contract_client.get("/openapi.json").json()["paths"]["/api/emoji"]["post"]["parameters"]
+    assert any(item["name"] == "Idempotency-Key" and item["required"] for item in parameters)
     assert authorized_contract_client.post("/api/emoji", json=payload, headers={"Idempotency-Key": "bad key"}).status_code == 422
     response = authorized_contract_client.options("/api/emoji", headers={"Origin": "http://127.0.0.1:5174", "Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "authorization,content-type,idempotency-key"})
     assert response.status_code == 200

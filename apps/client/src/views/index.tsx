@@ -95,7 +95,7 @@ function Records({
   return (
     <ul className="record-list">
       {records.map((record) => {
-        const session = sessions.find((item) => item.id === record.sessionId);
+        const session = record.classroom ?? sessions.find((item) => item.id === record.sessionId);
         const emotion = emotions[record.emotion];
         return (
           <li key={record.id} className="record">
@@ -110,7 +110,7 @@ function Records({
                   {record.source === 'AI'
                     ? 'AI 匿名'
                     : record.userId
-                      ? `学生 · ${record.userId.slice(0, 8)}`
+                      ? `学生 · ${record.student?.realName || record.student?.username || record.userId.slice(0, 8)}`
                       : '匿名记录'}
                 </span>
               )}
@@ -590,7 +590,10 @@ export function TeacherView(props: TeacherViewProps) {
                 <option value="">全部记录</option>
                 {ids.map((id) => (
                   <option key={id} value={id}>
-                    学生 · {id.slice(0, 8)}
+                    学生 ·{' '}
+                    {props.records.find((record) => record.userId === id)?.student?.realName ||
+                      props.records.find((record) => record.userId === id)?.student?.username ||
+                      id.slice(0, 8)}
                   </option>
                 ))}
                 {props.records.some((record) => record.source === 'AI') && (

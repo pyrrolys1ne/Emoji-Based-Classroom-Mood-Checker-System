@@ -7,6 +7,7 @@ import type { ClassSession, User } from '@mood/contracts';
 import { App } from '../App';
 import { ClientError, type ClientRepository } from '../models/client';
 import { useClassroom } from '../viewmodels/useClassroom';
+import { HistoryView } from '../views';
 
 const user: User = {
   id: 'student-1',
@@ -50,6 +51,34 @@ async function login(u: ReturnType<typeof userEvent.setup>) {
 afterEach(() => {
   cleanup();
   sessionStorage.clear();
+});
+
+it('已移出名单的个人历史仍显示记录中的课堂摘要', () => {
+  const { scheduledUserIds: _roster, ...classroom } = session();
+  render(
+    <HistoryView
+      sessions={[]}
+      selectedSessionId=""
+      onSessionChange={vi.fn()}
+      records={[
+        {
+          id: 'saved',
+          userId: user.id,
+          sessionId: classroom.id,
+          emotion: 'HAPPY',
+          source: 'MANUAL',
+          confidence: null,
+          recordedAt: classroom.startsAt,
+          classroom: { ...classroom, courseName: '原课堂课程' },
+        },
+      ]}
+      loading={false}
+      error=""
+      onRetry={vi.fn()}
+    />,
+  );
+  expect(screen.getByText('原课堂课程 · 一班')).toBeInTheDocument();
+  expect(screen.getByRole('option', { name: '全部课堂' })).toBeInTheDocument();
 });
 
 it('请求期间重复提交只发一次，失败保留选择且不显示成功', async () => {

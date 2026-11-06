@@ -16,6 +16,8 @@ export function recordUserLabel(data: WorkspaceData, record: EmojiRecord) {
   if (!record.userId) return '匿名';
   return (
     data.users.find((user) => user.id === record.userId)?.username ??
+    record.student?.realName ??
+    record.student?.username ??
     `用户 ${record.userId.slice(0, 8)}`
   );
 }

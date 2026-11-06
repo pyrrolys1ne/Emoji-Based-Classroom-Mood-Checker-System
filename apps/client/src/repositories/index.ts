@@ -33,12 +33,16 @@ const classroomStudent = (x: unknown) =>
   str(x.username) &&
   ['studentNo', 'realName', 'className'].every((key) => x[key] === null || str(x[key])) &&
   ['ACTIVE', 'DISABLED'].includes(x.status);
-const session = (x: unknown): x is ClassSession =>
+const classroomSummary = (x: unknown) =>
   obj(x) &&
   ['id', 'courseId', 'courseName', 'teacherName', 'className', 'room'].every((k) => str(x[k])) &&
   time(x.startsAt) &&
   time(x.endsAt) &&
   Date.parse(x.startsAt) < Date.parse(x.endsAt) &&
+  (x.teacherId === undefined || str(x.teacherId));
+const session = (x: unknown): x is ClassSession =>
+  obj(x) &&
+  classroomSummary(x) &&
   Array.isArray(x.scheduledUserIds) &&
   x.scheduledUserIds.every(str) &&
   (x.teacherId === undefined || str(x.teacherId)) &&
@@ -68,7 +72,13 @@ const record = (x: unknown): x is EmojiRecord =>
     ['DeepSeek', 'DeepFace'].includes(x.inferenceProvider)) &&
   (x.confidenceKind === undefined ||
     x.confidenceKind === null ||
-    ['self_reported', 'model_score'].includes(x.confidenceKind));
+    ['self_reported', 'model_score'].includes(x.confidenceKind)) &&
+  (x.classroom === undefined ||
+    x.classroom === null ||
+    (classroomSummary(x.classroom) && x.classroom.id === x.sessionId)) &&
+  (x.student === undefined ||
+    x.student === null ||
+    (classroomStudent(x.student) && x.student.id === x.userId));
 const stats = (x: unknown): x is EmotionStatistics =>
   obj(x) &&
   Number.isSafeInteger(x.total) &&
@@ -156,6 +166,8 @@ export function createApiRepository(
           INVALID_PASSWORD: { status: 403, message: '原密码错误，请重新输入。' },
           ACCOUNT_EXISTS: { status: 409, message: '用户名或邮箱已被使用。' },
           STUDENT_NO_EXISTS: { status: 409, message: '学号已被使用，请联系管理员核对。' },
+          CLASSROOM_NOT_OPEN: { status: 409, message: '请在课堂开始后、结束前提交反馈。' },
+          IDEMPOTENCY_CONFLICT: { status: 409, message: '本次重试与原反馈不一致，请核对历史。' },
         };
         const accountError = accountMessages[envelope.code];
         throw new ClientError(
@@ -234,7 +246,19 @@ export function createApiRepository(
       return d;
     },
     async submit(t, id, e, s, requestId = crypto.randomUUID()) {
-      await request('/emoji', 'POST', t, { sessionId: id, emotion: e }, s, requestId);
+      const d = await request('/emoji', 'POST', t, { sessionId: id, emotion: e }, s, requestId);
+      if (
+        !record(d) ||
+        d.sessionId !== id ||
+        d.emotion !== e ||
+        d.source !== 'MANUAL' ||
+        d.userId === null ||
+        d.confidence !== null ||
+        d.simulated === true ||
+        d.inferenceProvider != null ||
+        d.confidenceKind != null
+      )
+        throw bad();
     },
     async history(t, id, s) {
       const d = await request(
