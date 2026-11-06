@@ -41,7 +41,7 @@ def test_ai_token_and_payload_validation(monkeypatch):
     try:
         assert client.post("/api/ai/emoji-results", json=payload).status_code == 401
         headers = {"Authorization": "Bearer test-service-only", "Idempotency-Key": "test-event"}
-        assert client.post("/api/ai/emoji-results", headers=headers, json=payload).status_code == 501
+        assert client.post("/api/ai/emoji-results", headers={"Authorization": "Bearer test-service-only"}, json=payload).status_code == 422
         assert client.post("/api/ai/emoji-results", headers=headers, json={**payload, "confidence": 1.1}).status_code == 422
         assert client.post("/api/ai/emoji-results", headers=headers, json={**payload, "recordedAt": "2026-10-27T09:00:00"}).status_code == 422
     finally:

@@ -1,5 +1,17 @@
 # API 协作草案
 
+## v0.9 匿名 AI 入库
+
+正式后端已实现 `POST /api/ai/emoji-results`，使用独立 AI 服务令牌并返回统一包装。请求、错误与运行配置见 [AI 入库说明](backend-ai-ingestion.md)。本节覆盖旧版本 AI 入库状态，统计、导出、实时及 AI 控制代理仍未实现。
+
+- 请求使用既有 AIResult：`sessionId,emotion,confidence,recordedAt,deviceId` 必填，source 省略时为 AI，simulated 默认为 false，提供方和分数类型可空。confidence 必须为有限 JSON 数值且在 0—1 内，simulated 必须为布尔值；不接受用户编号、图像、视频、人脸特征或其他额外字段。只允许七种基本表情，DeepSeek 必须保留 self_reported 类型。
+- 新请求先验证课堂存在，采样时间必须带时区、不能晚于服务端当前时间，且属于 `[startsAt,endsAt)`。允许课后补传有效采样，不要求接收时间仍在课堂内；未知课堂返回 404，未来采样返回 422 INVALID_RECORD_TIME，课堂时段外返回 409 CLASSROOM_NOT_OPEN。
+- 默认拒绝 simulated，返回 403 SIMULATED_AI_DISABLED；隔离开发数据库显式开启 MOOD_ALLOW_SIMULATED_AI 后才可写入。关闭配置后同时禁止模拟重放并在历史中隐藏模拟记录。正式与模拟环境不混用数据。
+- 低于 MOOD_AI_MIN_CONFIDENCE（默认 0.5）返回 `{accepted:false,reason:"LOW_CONFIDENCE"}`，不创建情绪或接受审计；等于阈值可入库。接受返回 `{accepted:true,created:true,record}`，同键同载荷重放 created 为 false。record 的 userId、student 均为 null，来源为 AI，保留采样时间、设备标识（数据库字段）、模拟标记、提供方和分数类型；公开记录沿用 EmojiRecord，不公开设备编号。
+- Idempotency-Key 必填，AI 命名空间与学生手动命名空间隔离。所有已完成接受和过滤均保存请求摘要与回执，同键不同载荷返回 409 IDEMPOTENCY_CONFLICT；省略的默认值、等值数值、等值时区、标准 UUID 和去除首尾空白的设备标识参与规范化。阈值变化不改变已有结果，非法请求不占用键。
+- 新增迁移 006_ai_ingestion.sql，将已有带键 AI 记录回填为接受回执，保留既有记录和手动键。按键事务锁协调多个进程，数据库唯一约束防重复；接受记录、回执和 AI_RESULT_ACCEPT 审计在同一事务提交，服务身份的 audit.actorId 为 null。过滤回执也须提交成功后才返回；失败回滚，原键可重试。
+- AI 服务只在收到完整、有效且与原载荷一致的接受回执，或明确 LOW_CONFIDENCE 过滤回执时移除待上报项。网络失败、408、429、5xx 或无效回执保持稳定键和原载荷并退避重试；其他非成功状态停止当前采集并保留待上报队列，修正配置或数据问题后显式重启。原始帧不进入队列或入库接口。
+
 ## v0.8 手动反馈与授权历史
 
 正式后端已实现 `POST /api/emoji` 和 `GET /api/emoji/history`；成功响应在事务提交后返回，接口示例见 [手动反馈与历史](backend-feedback.md)。本节覆盖较旧版本的反馈与历史实现状态，统计、导出、实时和 AI 入库仍未开放。

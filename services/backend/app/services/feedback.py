@@ -9,31 +9,13 @@ from app.db.session import transaction
 from app.repositories.accounts import AccountsRepository
 from app.repositories.classrooms import ClassroomsRepository
 from app.repositories.feedback import FeedbackRepository
-from app.schemas.contracts import ClassroomStudent, ClassroomSummary, EmojiRecord, EmojiSubmission, RecordFilters
+from app.schemas.contracts import EmojiRecord, EmojiSubmission, RecordFilters
 from app.services.accounts import Principal, authorize_actor
+from app.services.record_views import record_response
 
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
-
-
-def _responses(rows) -> list[EmojiRecord]:
-    return [EmojiRecord(
-        id=record.id, user_id=record.user_id, session_id=record.session_id,
-        emotion=record.emotion, source=record.source, confidence=record.confidence,
-        recorded_at=record.recorded_at.astimezone(timezone.utc), simulated=record.simulated,
-        inference_provider=record.inference_provider, confidence_kind=record.confidence_kind,
-        classroom=ClassroomSummary(
-            id=classroom.id, course_id=classroom.course_id, course_name=course_name,
-            teacher_id=classroom.teacher_id, teacher_name=teacher.real_name or teacher.username,
-            class_name=classroom.class_name, room=classroom.room,
-            starts_at=classroom.starts_at.astimezone(timezone.utc), ends_at=classroom.ends_at.astimezone(timezone.utc),
-        ),
-        student=ClassroomStudent(
-            id=student.id, username=student.username, student_no=student.student_no,
-            real_name=student.real_name, class_name=student.class_name, status=student.status,
-        ) if student is not None else None,
-    ) for record, classroom, course_name, teacher, student in rows]
 
 
 def submit(principal: Principal, body: EmojiSubmission, key: str) -> EmojiRecord:
@@ -65,7 +47,7 @@ def submit(principal: Principal, body: EmojiSubmission, key: str) -> EmojiRecord
                 recorded_at=now, idempotency_key=key, request_hash=request_hash,
             )
             accounts.audit("EMOJI_MANUAL_SUBMIT", actor.id, record.id)
-        result = _responses(repo.rows(actor.role, actor.id, RecordFilters(), record_id=record.id))[0]
+        result = record_response(repo.rows(actor.role, actor.id, RecordFilters(), record_id=record.id)[0])
     return result
 
 
@@ -86,5 +68,5 @@ def history(principal: Principal, filters: RecordFilters) -> list[EmojiRecord]:
                 and not repo.owns_history(classroom.id, actor.id)
             ):
                 raise ApiError(403, "FORBIDDEN", "无权查询该课堂记录。")
-        result = _responses(repo.rows(actor.role, actor.id, filters, allow_simulated=get_settings().allow_simulated_ai))
+        result = [record_response(row) for row in repo.rows(actor.role, actor.id, filters, allow_simulated=get_settings().allow_simulated_ai)]
     return result

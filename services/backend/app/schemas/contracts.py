@@ -207,11 +207,11 @@ class ExportFilters(StatisticsFilters):
 class AIResult(Contract):
     session_id: UUID
     emotion: AIEmotion
-    confidence: float = Field(ge=0, le=1, allow_inf_nan=False)
+    confidence: float = Field(ge=0, le=1, allow_inf_nan=False, strict=True)
     recorded_at: AwareDatetime
     device_id: Name
     source: Literal["AI"] = "AI"
-    simulated: bool = False
+    simulated: bool = Field(default=False, strict=True)
     inference_provider: Literal["DeepSeek", "DeepFace"] | None = None
     confidence_kind: Literal["self_reported", "model_score"] | None = None
 

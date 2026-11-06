@@ -8,6 +8,7 @@ from pathlib import Path
 import httpx
 
 from .outbox import Outbox
+from .delivery import confirmed_result
 from .pipeline import Camera, DeepFaceModel, EMOTION_MAP, Prediction, map_predictions
 from .vision import DeepSeekCameraModel, VisionError
 
@@ -112,20 +113,14 @@ class Runner:
             )
             if response.status_code in {408, 429} or response.status_code >= 500:
                 raise httpx.TransportError("可重试的服务端错误")
-            if response.is_error:
+            if not response.is_success:
                 raise RuntimeError(
                     f"后端拒绝上报（HTTP {response.status_code}），已保留待上报结果"
                 )
-            body = response.json()
-            if (
-                body.get("code") != "OK"
-                or not isinstance(body.get("data"), dict)
-                or not isinstance(body["data"].get("accepted"), bool)
-            ):
-                raise RuntimeError("后端响应不符合 AI 接口契约，结果保留在队列")
+            accepted = confirmed_result(response.json(), payload)
             self.outbox.remove(key)
             with self.lock:
-                if body["data"]["accepted"]:
+                if accepted:
                     self.state["submitted"] += 1
                 else:
                     self.state["filtered"] += 1
@@ -137,7 +132,7 @@ class Runner:
         except (httpx.HTTPError, ValueError):
             with self.lock:
                 self.state["failed"] += 1
-                self.state["lastError"] = "后端连接失败，结果已排队，正在退避重试"
+                self.state["lastError"] = "后端未确认上报结果，结果已排队，正在退避重试"
             logger.warning("AI result delivery failed; queued for retry")
             return False
 

@@ -1,6 +1,6 @@
 # 手动反馈与历史
 
-正式后端使用 PostgreSQL 保存手动反馈、幂等键和审计。启动、账号和课堂初始化分别见 [数据库说明](backend-database.md)、[账号说明](backend-auth.md)、[课堂说明](backend-classrooms.md)。应用健康接口 stage 为 `feedback`；基础统计、实时看板、导出和 AI 入库仍返回 501。
+正式后端使用 PostgreSQL 保存手动反馈、幂等键和审计。启动、账号和课堂初始化分别见 [数据库说明](backend-database.md)、[账号说明](backend-auth.md)、[课堂说明](backend-classrooms.md)。应用健康接口 stage 为 `ai-ingestion`；基础统计、实时看板和导出仍未开放，AI 接口见 [匿名 AI 入库](backend-ai-ingestion.md)。
 
 ## 提交
 
@@ -44,7 +44,7 @@ Authorization: Bearer <用户令牌>
 
 每条正式记录附带 `classroom` 摘要 `{id,courseId,courseName,teacherId,teacherName,className,room,startsAt,endsAt}` 和 `student` 摘要 `{id,username,studentNo,realName,className,status}`；不包含完整名单、邮箱、密码、令牌或内部幂等信息。资料按当前授权范围读取，资料更正后摘要可变化。学生在“我的记录”选择“全部课堂”可查看已移出名单课堂的反馈，展示使用记录中的课堂摘要。
 
-AI 的 userId 与 student 均为 null；保留 `inferenceProvider`、`confidenceKind` 和原始分数，DeepSeek 的 `self_reported` 不是准确率或校准概率。默认不返回 simulated 数据；仅隔离开发环境可配置 `MOOD_ALLOW_SIMULATED_AI=true` 并保留模拟标记。本接口读取已有结构化记录，不接收图像，也不提供 AI 入库。
+AI 的 userId 与 student 均为 null；保留 `inferenceProvider`、`confidenceKind` 和原始分数，DeepSeek 的 `self_reported` 不是准确率或校准概率。默认不返回 simulated 数据；仅隔离开发环境可配置 `MOOD_ALLOW_SIMULATED_AI=true` 并保留模拟标记。历史接口读取已有结构化记录，不接收图像；AI 写入使用独立的 [入库接口](backend-ai-ingestion.md)。
 
 ## 错误与验证
 

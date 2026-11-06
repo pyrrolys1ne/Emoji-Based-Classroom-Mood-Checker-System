@@ -57,7 +57,8 @@ def camera_runtime(tmp_path, monkeypatch):
 
     def handler(request):
         payloads.append(json.loads(request.content))
-        return httpx.Response(200, json={"code": "OK", "data": {"accepted": True}})
+        return httpx.Response(200, json={"code": "OK", "data": {"accepted": True, "created": True,
+            "record": {**payloads[-1], "id": str(uuid4()), "userId": None}}})
 
     original_client = httpx.Client
     monkeypatch.setattr(runner_module, "Camera", Camera)

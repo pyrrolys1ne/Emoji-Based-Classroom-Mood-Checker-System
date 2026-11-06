@@ -1,3 +1,4 @@
+import json
 from uuid import uuid4
 
 import httpx
@@ -31,7 +32,8 @@ def test_retry_uses_same_key_and_survives_restart(tmp_path, monkeypatch):
     path = str(tmp_path / "outbox.sqlite")
     runner = Runner(path)
     runner.outbox.put(
-        {"sessionId": str(uuid4()), "emotion": "HAPPY", "confidence": 0.9}
+        {"sessionId": str(uuid4()), "emotion": "HAPPY", "confidence": 0.9,
+         "recordedAt": "2026-11-06T00:00:00Z", "deviceId": "test-camera", "source": "AI"}
     )
     keys = []
 
@@ -39,7 +41,9 @@ def test_retry_uses_same_key_and_survives_restart(tmp_path, monkeypatch):
         keys.append(request.headers["Idempotency-Key"])
         if len(keys) == 1:
             raise httpx.ConnectError("offline")
-        return httpx.Response(200, json={"code": "OK", "data": {"accepted": True}})
+        payload = json.loads(request.content)
+        return httpx.Response(200, json={"code": "OK", "data": {"accepted": True, "created": False,
+            "record": {**payload, "id": str(uuid4()), "userId": None}}})
 
     with httpx.Client(transport=httpx.MockTransport(handler)) as client:
         assert not runner.send_one(client)

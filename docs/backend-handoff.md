@@ -1,15 +1,14 @@
 # 后端联调交接说明
 
-管理端已有登录适配、课堂安排、历史查询、实时看板、多维统计与 CSV；AI 服务已接通 DeepSeek 图片和摄像头推理、过滤、匿名上报与重试。管理端与 AI 的完整参考链路使用 `services/integration` 和 SQLite；正式后端 `services/backend` 已提供真实账号认证、教师审批、课程课堂管理、学生资料和安排、手动反馈与授权历史，统计、实时及 AI 入库仍待实现。
+管理端已有登录适配、课堂安排、历史查询、实时看板、多维统计与 CSV；AI 服务已接通 DeepSeek 图片和摄像头推理、过滤、匿名上报与重试。管理端与 AI 的完整参考链路使用 `services/integration` 和 SQLite；正式后端 `services/backend` 已提供真实账号认证、教师审批、课程课堂管理、学生资料和安排、手动反馈、授权历史和匿名 AI 入库，统计、实时及 AI 控制仍待实现。
 
-正式后端已有 SQLAlchemy 实体、连接池与显式事务、顺序 SQL 迁移和真实 PostgreSQL 测试入口。账号、课堂及反馈已接入持久化；管理员与课堂数据通过受控命令初始化，关键操作与审计同事务提交。课堂按实际任课教师和学生安排过滤，学生名单响应仅包含本人；手动反馈校验时段和幂等，历史保留已移出名单学生的本人记录。接口状态以 [API 契约 v0.8](api-contract.md) 为准，运行方法见 [账号说明](backend-auth.md)、[课堂说明](backend-classrooms.md)、[反馈说明](backend-feedback.md) 和 [数据库说明](backend-database.md)。
+正式后端已有 SQLAlchemy 实体、连接池与显式事务、顺序 SQL 迁移和真实 PostgreSQL 测试入口。账号、课堂及反馈已接入持久化；管理员与课堂数据通过受控命令初始化，关键操作与审计同事务提交。课堂按实际任课教师和学生安排过滤，学生名单响应仅包含本人；手动反馈校验时段和幂等，历史保留已移出名单学生的本人记录。接口状态以 [API 契约 v0.9](api-contract.md) 为准，运行方法见 [账号说明](backend-auth.md)、[课堂说明](backend-classrooms.md)、[反馈说明](backend-feedback.md)、[AI 入库](backend-ai-ingestion.md) 和 [数据库说明](backend-database.md)。
 
 ## 后端需要完成的工作
 
 | 优先级 | 工作与接口                                                                      | 关键要求                                                                                                        |
 | ------ | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | 2      | 基础统计：`GET /api/emoji/statistics`                                           | 默认 MANUAL，支持来源与授权范围筛选，九种情绪分布完整且总和等于 total                                           |
-| 1      | AI 入库：`POST /api/ai/emoji-results`                                           | 独立服务令牌；持久化匿名记录；以 `Idempotency-Key` 唯一约束去重，同键不同载荷返回 409                           |
 | 2      | 实时推送：`POST /api/auth/ws-ticket`、`WebSocket /ws/dashboard`、实时看板接口   | 一次性票据有效期 30 秒；按可见课堂范围通知刷新；退出后关闭连接                                                  |
 | 2      | 多维统计与 CSV：`GET /api/admin/statistics`、`GET /api/admin/emoji/export`      | 支持课程、班级、时间筛选；时间采用 `[from,to)`；全量聚合，不能只统计当前页；导出防公式注入                      |
 | 2      | AI 管理代理：`/api/admin/ai/status`、`start`、`stop`、`vision`、`analyze-image` | 仅限管理员，转发至 AI 服务的 `/control/*`；支持 `camera-api` 及采样上限；服务令牌和 DeepSeek 密钥不发送到浏览器 |

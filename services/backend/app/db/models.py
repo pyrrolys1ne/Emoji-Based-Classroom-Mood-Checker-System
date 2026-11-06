@@ -104,6 +104,20 @@ Index("emoji_session_time_idx", EmojiRecord.session_id, EmojiRecord.recorded_at.
 Index("emoji_user_time_idx", EmojiRecord.user_id, EmojiRecord.recorded_at.desc())
 
 
+class AIIngestion(Base):
+    __tablename__ = "ai_ingestion"
+    __table_args__ = (
+        CheckConstraint("idempotency_key ~ '^[A-Za-z0-9._:-]{1,100}$'", name="ai_ingestion_key_check"),
+        CheckConstraint("request_hash ~ '^[0-9a-f]{64}$'", name="ai_ingestion_hash_check"),
+        CheckConstraint("(record_id IS NOT NULL AND reason IS NULL) OR (record_id IS NULL AND reason IS NOT NULL AND reason = 'LOW_CONFIDENCE')", name="ai_ingestion_outcome_check"),
+    )
+    idempotency_key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    request_hash: Mapped[str] = mapped_column(String(64))
+    record_id: Mapped[UUID | None] = mapped_column(ForeignKey("emoji_record.id"), unique=True)
+    reason: Mapped[str | None] = mapped_column(String(30))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"))
+
+
 class AuditLog(Identity, Base):
     __tablename__ = "audit_log"
     actor_id: Mapped[UUID | None] = mapped_column(ForeignKey("app_user.id"))

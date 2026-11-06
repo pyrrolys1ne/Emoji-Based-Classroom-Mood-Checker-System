@@ -38,8 +38,10 @@ jobs:
         with:
           python-version: '3.13'
           cache: pip
-          cache-dependency-path: services/backend/requirements*.txt
-      - run: pip install -r services/backend/requirements-dev.txt
+          cache-dependency-path: |
+            services/backend/requirements*.txt
+            services/ai/requirements.txt
+      - run: pip install -r services/backend/requirements-dev.txt -r services/ai/requirements.txt
       - run: python -m pytest -q
         working-directory: services/backend
   admin-ai-integration:
