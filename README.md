@@ -73,6 +73,8 @@ $env:PYTHONPATH = 'services/backend'
 
 本地配置参考 `services/backend/.env.example`，复制为同目录 `.env` 后修改；配置文件路径独立于启动时所在目录。后端已实现注册、登录、本人信息、改密、注销、管理员用户目录、教师审批、课程课堂管理、学生资料、安排名单、手动反馈、授权历史查询和匿名 AI 入库。密码使用 Argon2id 加盐哈希，会话、反馈和审计持久化至 PostgreSQL。未携带有效身份的受保护请求返回 401，无所需角色返回 403。基础与多维统计、CSV 导出已接入全量记录，实时票据、WebSocket 刷新通知、授权看板和管理员 AI 控制代理已接通。
 
+后端接口、配置与调用约束见 [后端接入说明](docs/backend-handoff.md)，权限、异常及持久性核对见 [后端联调验收清单](docs/backend-acceptance.md)。
+
 首个管理员通过受控命令初始化，终端隐藏读取并确认密码：
 
 ```powershell
