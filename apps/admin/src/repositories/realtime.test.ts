@@ -89,3 +89,9 @@ it('按 API 域名选择通道，HTTPS 自动使用 wss', () => {
   );
   expect(realtimeUrl('/api', 'http://127.0.0.1:5175', 't').protocol).toBe('ws:');
 });
+
+it.each(['', '   '])('空的构建配置 %j 使用默认实时路径', (endpoint) => {
+  expect(realtimeUrl('/api', 'https://mood.example', 't', endpoint).href).toBe(
+    'wss://mood.example/ws/dashboard?ticket=t',
+  );
+});

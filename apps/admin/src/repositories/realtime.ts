@@ -9,7 +9,7 @@ export function realtimeUrl(
   ticket: string,
   endpoint = '/ws/dashboard',
 ) {
-  const url = new URL(endpoint, new URL(api, origin));
+  const url = new URL(endpoint.trim() || '/ws/dashboard', new URL(api, origin));
   if (url.protocol === 'https:') url.protocol = 'wss:';
   else if (url.protocol === 'http:') url.protocol = 'ws:';
   if (!['ws:', 'wss:'].includes(url.protocol) || url.username || url.password)

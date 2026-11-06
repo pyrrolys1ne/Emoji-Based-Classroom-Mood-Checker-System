@@ -36,7 +36,7 @@ $env:PYTHONPATH = 'services/ai'
 
 本页的公开样本分析与 [摄像头实验](camera-api.md) 是两个入口。摄像头实验通过独立启动参数明确允许发送实时帧，并配置有限次数与时长；同样不保存原始影像，但可将匿名结构化结果写入所选课堂。
 
-管理员调用 `GET /api/admin/ai/vision` 获取配置状态和样本目录，调用 `POST /api/admin/ai/analyze-image` 提交 `{ "imageId": "portrait-01", "allowRemoteUpload": true }`。参考服务通过独立控制令牌转发到 AI 服务的 `/control/vision` 和 `/control/analyze-image`。正式后端尚未实现这些代理。
+管理员调用 `GET /api/admin/ai/vision` 获取配置状态和样本目录，调用 `POST /api/admin/ai/analyze-image` 提交 `{ "imageId": "portrait-01", "allowRemoteUpload": true }`。正式后端与独立参考服务均通过独立控制令牌转发到 AI 服务的 `/control/vision` 和 `/control/analyze-image`；正式后端另校验当前管理员、固定目标、样本清单及明确许可，并记录控制审计，见 [实时与 AI 控制](backend-realtime-ai.md)。
 
 接口只接受清单内已下载样本的编号，不接受任意文件路径或远程 URL。AI 服务将清除元数据后的 JPEG 以内联 base64 发送至固定官方地址 `https://api.deepseek.com/chat/completions`，禁止 HTTP 重定向。上游使用 JSON 输出，严格校验类别、分数范围、字段与完成状态；不完整、越界或未知类别不作为成功返回。
 

@@ -6,5 +6,11 @@
 **/.pytest_cache
 **/.local
 **/.env
-**/.env.local
+**/.env.*
+!**/.env.example
+!**/.env.*.example
+**/*.log
+**/test-results
+**/playwright-report
+**/coverage
 *.docx

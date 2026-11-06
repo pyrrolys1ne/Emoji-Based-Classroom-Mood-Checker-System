@@ -31,9 +31,9 @@ services/
     tests/               接口与安全边界检查
   ai/                    独立 AI 服务及推理管线扩展点
   integration/           管理端与 AI 本地参考服务，非正式后端
-scripts/                 联调进程启动与关闭
+scripts/                 联调进程管理与隔离系统验收
 infra/                   PostgreSQL 初始脚本与 Dockerfile
-docs/                    架构、接口与团队协作说明
+docs/                    架构、接口、部署与验收说明
 .github/workflows/       前后端构建与测试 CI
 AGENTS.md                开发规范与技术约束
 ```
@@ -114,10 +114,12 @@ macOS / Linux 使用 `.venv/bin/python` 替换 `.venv\Scripts\python.exe`。
 
 ```powershell
 Copy-Item .env.example .env
-docker compose up --build -d
+docker compose up --build -d --wait
 ```
 
-前端仍通过 npm 启动。`migrate` 服务在 PostgreSQL 就绪后按顺序执行 `infra/database/001` 至 `007`，成功后启动后端；已有数据卷使用相同入口升级。迁移记录版本和校验和，兼容由原有三份完整 SQL 初始化的旧库。结构包含用户、课程、课堂、安排、记录、审计、教师审批、登录会话、一次性票据、课堂初始化批次、AI 接受与过滤回执及课堂变更版本，后续变更新增迁移。用法和配置见 [后端数据库说明](docs/backend-database.md)。不内置管理员账号，使用受控命令创建。默认数据库密码仅供本地开发，部署前更换。服务端口均绑定本机回环地址。
+Compose 同时构建 API 模式的管理端和客户端，由 Nginx 在 5173、5174 端口提供静态文件及 `/api/`、`/ws/dashboard` 代理。`migrate` 服务在 PostgreSQL 就绪后按顺序执行 `infra/database/001` 至 `007`，成功后启动后端；已有数据卷使用同一迁移入口。AI 的内部地址和独立令牌与后端同步，匿名重试队列保存到 `mood_ai_data` 卷，重启不自动采集。镜像不包含真实模型依赖或摄像头映射。
+
+迁移记录版本和校验和，结构与升级见 [后端数据库说明](docs/backend-database.md)。不内置管理员账号；执行 `docker compose exec backend python -m app.cli.bootstrap_admin --username admin --email admin@example.edu` 受控创建。默认数据库密码仅供本地开发，启动前更换并配置两个不同的随机 AI 令牌。端口只绑定回环地址，域名、TLS、来源配置、升级与备份恢复见 [部署说明](docs/deployment.md)。普通停止保留数据卷，不要在需要保留数据的环境执行 `down --volumes`。
 
 ## 管理端接入真实 API
 
@@ -136,4 +138,6 @@ Push-Location services/backend
 Pop-Location
 ```
 
-CI 执行前端构建、管理端模型测试、后端、AI 与独立联调测试。完整测试指令见 `docs/admin-ai.md`。模型效果与部署兼容性应使用对应的运行环境评估。
+设置具备创建数据库权限的 `MOOD_TEST_DATABASE_URL` 后，运行 `npm run test:system` 可验证两个生产构建、正式后端、真实 PostgreSQL 与独立 AI 的完整链路；使用独立临时库、随机令牌及明确标记的模拟输入，不使用参考联调替身。Docker 环境运行 `npm run test:system -- --runtime compose`，另验证 Nginx 代理、持久卷和备份恢复。
+
+CI 执行类型与构建、前后端业务测试、AI 与联调测试、客户端浏览器兼容检查，以及真实数据库和容器系统验收。运行前提、覆盖和未执行的真实模型、摄像头、远程推理及目标主机项目见 [系统验收](docs/system-acceptance.md)。

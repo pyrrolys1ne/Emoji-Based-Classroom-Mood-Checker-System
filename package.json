@@ -18,7 +18,8 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test:client": "npm run test --workspace @mood/client"
+    "test:client": "npm run test --workspace @mood/client",
+    "test:system": "node scripts/test-system.mjs"
   },
   "devDependencies": {
     "prettier": "^3.9.10"
