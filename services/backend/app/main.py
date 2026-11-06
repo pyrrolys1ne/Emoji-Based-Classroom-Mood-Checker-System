@@ -17,7 +17,7 @@ async def lifespan(_app: FastAPI):
         close_database()
 
 settings = get_settings()
-app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan, description="账号、会话认证、教师审批与角色权限已实现；课堂、情绪、统计及 AI 入库业务仍返回 501。")
+app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan, description="账号、教师审批、课程与课堂管理、学生资料和安排已实现；情绪、统计及 AI 入库业务仍返回 501。")
 app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_credentials=False, allow_methods=["GET", "POST", "PUT"], allow_headers=["Authorization", "Content-Type", "Idempotency-Key"])
 install_error_handlers(app)
 app.include_router(router)

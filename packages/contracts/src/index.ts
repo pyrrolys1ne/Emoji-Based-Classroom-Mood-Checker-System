@@ -64,6 +64,7 @@ export interface TeacherApplication {
 }
 export interface SessionRequest {
   courseId: string;
+  teacherId?: string;
   startsAt: string;
   endsAt: string;
   room: string;
@@ -88,11 +89,21 @@ export interface ClassSession {
   courseId: string;
   courseName: string;
   teacherName: string;
+  teacherId?: string;
   className: string;
   room: string;
   startsAt: string;
   endsAt: string;
   scheduledUserIds: string[];
+  scheduledStudents?: ClassroomStudent[];
+}
+export interface ClassroomStudent {
+  id: string;
+  username: string;
+  studentNo: string | null;
+  realName: string | null;
+  className: string | null;
+  status: UserStatus;
 }
 export interface EmojiRecord {
   id: string;

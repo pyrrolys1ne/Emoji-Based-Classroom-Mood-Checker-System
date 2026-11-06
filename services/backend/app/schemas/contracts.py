@@ -84,6 +84,12 @@ class StudentProfileRequest(Contract):
     real_name: Name | None = None
     class_name: Name | None = None
 
+    @model_validator(mode="after")
+    def specified_fields(self):
+        if not self.model_fields_set:
+            raise ValueError("至少提供一个学生资料字段")
+        return self
+
 
 class TeacherReviewRequest(Contract):
     decision: Literal["APPROVED", "REJECTED"]
@@ -111,6 +117,7 @@ class TeacherApplication(Contract):
 
 class SessionRequest(Contract):
     course_id: UUID
+    teacher_id: UUID | None = None
     starts_at: AwareDatetime
     ends_at: AwareDatetime
     room: Name
@@ -118,9 +125,59 @@ class SessionRequest(Contract):
 
     @model_validator(mode="after")
     def time_order(self):
+        if "teacher_id" in self.model_fields_set and self.teacher_id is None:
+            raise ValueError("任课教师不能显式设为空")
         if self.ends_at <= self.starts_at:
             raise ValueError("课堂结束时间必须晚于开始时间")
         return self
+
+
+class ClassroomSeedCourse(Contract):
+    key: Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9._-]{1,50}$")]
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=150)]
+    teacher_username: Username
+
+
+class ClassroomSeedSession(Contract):
+    course_key: str
+    teacher_username: Username | None = None
+    starts_at: AwareDatetime
+    ends_at: AwareDatetime
+    room: Name
+    class_name: Name
+    student_usernames: list[Username] = Field(default_factory=list, max_length=500)
+
+    @model_validator(mode="after")
+    def time_order(self):
+        if self.ends_at <= self.starts_at:
+            raise ValueError("课堂结束时间必须晚于开始时间")
+        return self
+
+
+class ClassroomSeedRequest(Contract):
+    import_id: UUID
+    courses: list[ClassroomSeedCourse] = Field(min_length=1, max_length=100)
+    sessions: list[ClassroomSeedSession] = Field(min_length=1, max_length=500)
+
+    @model_validator(mode="after")
+    def references(self):
+        keys = {course.key for course in self.courses}
+        if len(keys) != len(self.courses) or any(item.course_key not in keys for item in self.sessions):
+            raise ValueError("课程引用必须存在且键不能重复")
+        names = {course.teacher_username for course in self.courses}
+        for item in self.sessions:
+            names.update(item.student_usernames)
+            if item.teacher_username:
+                names.add(item.teacher_username)
+        if len(names) > 2000:
+            raise ValueError("单个批次引用的账号不能超过 2000 个")
+        return self
+
+
+class ClassroomSeedResult(Contract):
+    import_id: UUID
+    course_ids: list[UUID]
+    session_ids: list[UUID]
 
 
 class RecordFilters(Contract):
@@ -185,16 +242,27 @@ class AuthSession(Contract):
     user: User
 
 
+class ClassroomStudent(Contract):
+    id: UUID
+    username: str
+    student_no: str | None
+    real_name: str | None
+    class_name: str | None
+    status: UserStatus
+
+
 class ClassSession(Contract):
     id: UUID
     course_id: UUID
     course_name: str
     teacher_name: str
+    teacher_id: UUID
     class_name: str
     room: str
     starts_at: AwareDatetime
     ends_at: AwareDatetime
     scheduled_user_ids: list[UUID]
+    scheduled_students: list[ClassroomStudent] = Field(default_factory=list)
 
 
 class EmojiRecord(Contract):

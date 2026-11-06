@@ -38,6 +38,8 @@ AI 幂等键在 AI 来源内唯一，手动幂等键按学生隔离，与 AI 互
 
 `app.db.models` 与 SQL 结构保持一致；运行服务不调用 `create_all`，以免绕过迁移。
 
+`005_classroom_management.sql` 为课堂增加独立且非空的 teacher_id，从迁移时关联课程回填，保留已有课堂编号、学生安排及情绪记录。课程默认教师的后续变更不转移已有课堂权限，索引支持按任课教师和时间查询。新增 classroom_import 保存受控初始化批次，唯一主键防止重复提交；课程、课堂、安排及批次审计同事务提交。接口和命令见 [课程课堂说明](backend-classrooms.md)。
+
 ## 配置
 
 后端读取 `services/backend/.env`，进程环境变量优先。连接字符串必须使用 `postgresql+psycopg` 并指定数据库；URL 中的密码含特殊字符时需要 URL 编码。

@@ -179,6 +179,45 @@ it('serializes concurrent writes across repositories sharing storage', async () 
 });
 
 describe('API boundary coverage', () => {
+  it('preserves scoped classroom roster fields and rejects inconsistent roster responses', async () => {
+    const row = {
+      id: 'classroom',
+      courseId: 'course',
+      courseName: '课程',
+      teacherName: '教师',
+      teacherId: 'teacher',
+      className: '班级',
+      room: '101',
+      startsAt: '2027-01-01T09:00:00+08:00',
+      endsAt: '2027-01-01T10:00:00+08:00',
+      scheduledUserIds: ['student'],
+      scheduledStudents: [
+        {
+          id: 'student',
+          username: 'student',
+          studentNo: '20260001',
+          realName: '学生',
+          className: '班级',
+          status: 'ACTIVE',
+        },
+      ],
+    };
+    const repository = (value: unknown) =>
+      createApiRepository({
+        fetcher: (async () =>
+          new Response(JSON.stringify({ code: 'OK', data: [value] }))) as typeof fetch,
+      });
+    expect(await repository(row).sessions('token')).toEqual([row]);
+    for (const invalid of [
+      { ...row, teacherId: 1 },
+      { ...row, scheduledUserIds: ['other'] },
+      { ...row, scheduledStudents: [{ ...row.scheduledStudents[0], status: 'unknown' }] },
+    ]) {
+      await expect(repository(invalid).sessions('token')).rejects.toMatchObject({
+        code: 'INVALID_RESPONSE',
+      });
+    }
+  });
   it.each([
     [403, 'TEACHER_APPROVAL_REQUIRED', '教师申请尚未获准'],
     [403, 'ACCOUNT_DISABLED', '账号已禁用'],

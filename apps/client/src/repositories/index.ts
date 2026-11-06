@@ -27,6 +27,12 @@ const user = (x: unknown): x is User =>
   (x.teacherApprovalStatus === undefined ||
     x.teacherApprovalStatus === null ||
     ['PENDING', 'APPROVED', 'REJECTED'].includes(x.teacherApprovalStatus));
+const classroomStudent = (x: unknown) =>
+  obj(x) &&
+  str(x.id) &&
+  str(x.username) &&
+  ['studentNo', 'realName', 'className'].every((key) => x[key] === null || str(x[key])) &&
+  ['ACTIVE', 'DISABLED'].includes(x.status);
 const session = (x: unknown): x is ClassSession =>
   obj(x) &&
   ['id', 'courseId', 'courseName', 'teacherName', 'className', 'room'].every((k) => str(x[k])) &&
@@ -34,7 +40,15 @@ const session = (x: unknown): x is ClassSession =>
   time(x.endsAt) &&
   Date.parse(x.startsAt) < Date.parse(x.endsAt) &&
   Array.isArray(x.scheduledUserIds) &&
-  x.scheduledUserIds.every(str);
+  x.scheduledUserIds.every(str) &&
+  (x.teacherId === undefined || str(x.teacherId)) &&
+  (x.scheduledStudents === undefined ||
+    (Array.isArray(x.scheduledStudents) &&
+      x.scheduledStudents.every(classroomStudent) &&
+      x.scheduledStudents.length === x.scheduledUserIds.length &&
+      new Set(x.scheduledStudents.map((student) => student.id)).size ===
+        x.scheduledStudents.length &&
+      x.scheduledStudents.every((student) => x.scheduledUserIds.includes(student.id))));
 const record = (x: unknown): x is EmojiRecord =>
   obj(x) &&
   str(x.id) &&

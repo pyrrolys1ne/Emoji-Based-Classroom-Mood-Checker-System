@@ -4,11 +4,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from app.api.accounts import router as accounts_router
+from app.api.classrooms import router as classrooms_router
 from app.core.security import require_admin, require_ai, require_student, require_teacher_or_admin, require_user
 from app.schemas.contracts import (
-    AIAccepted, AIFiltered, AIResult, ClassSession, EmojiRecord, EmojiSubmission,
+    AIAccepted, AIFiltered, AIResult, EmojiRecord, EmojiSubmission,
     EmotionStatistics, Envelope, ExportFilters, IdempotencyKey,
-    RecordFilters, ScheduleRequest, StatisticsFilters,
+    RecordFilters, StatisticsFilters,
 )
 from app.services.business import pending
 from app.services.health import readiness
@@ -18,7 +19,7 @@ router = APIRouter(prefix="/api")
 
 @router.get("/health", tags=["运行状态"], response_model=Envelope[dict[str, str]])
 def health():
-    return Envelope(data={"status": "ok", "version": "0.1.0", "stage": "accounts"})
+    return Envelope(data={"status": "ok", "version": "0.1.0", "stage": "classrooms"})
 
 
 @router.get("/ready", tags=["运行状态"], response_model=Envelope[dict[str, str]])
@@ -29,16 +30,6 @@ def ready():
 
 
 protected = APIRouter(dependencies=[Depends(require_user)])
-
-
-@protected.get("/sessions", tags=["课堂"], response_model=Envelope[list[ClassSession]])
-def sessions():
-    return pending("课堂会话查询")
-
-
-@protected.post("/admin/sessions/{session_id}/schedule", tags=["课堂"], dependencies=[Depends(require_admin)])
-def schedule(session_id: UUID, body: ScheduleRequest):
-    return pending("课堂用户安排")
 
 
 @protected.post("/emoji", tags=["情绪"], response_model=Envelope[EmojiRecord], dependencies=[Depends(require_student)])
@@ -78,3 +69,4 @@ def ai_results(body: AIResult, idempotency_key: Annotated[IdempotencyKey, Header
 
 router.include_router(protected)
 router.include_router(accounts_router)
+router.include_router(classrooms_router)

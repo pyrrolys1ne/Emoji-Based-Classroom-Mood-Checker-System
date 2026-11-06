@@ -18,6 +18,15 @@ class AccountsRepository:
             query = query.with_for_update().execution_options(populate_existing=True)
         return self.session.scalar(query)
 
+    def find_users(self, usernames: set[str]) -> list[AppUser]:
+        return list(self.session.scalars(select(AppUser).where(AppUser.username.in_(usernames))).all())
+
+    def approval_statuses(self, user_ids: list[UUID]) -> dict[UUID, str]:
+        return dict(self.session.execute(
+            select(TeacherApplication.user_id, TeacherApplication.status)
+            .where(TeacherApplication.user_id.in_(user_ids))
+        ).all())
+
     def lock_users(self, user_ids: list[UUID]) -> dict[UUID, AppUser]:
         rows = self.session.scalars(
             select(AppUser).where(AppUser.id.in_(user_ids)).order_by(AppUser.id)

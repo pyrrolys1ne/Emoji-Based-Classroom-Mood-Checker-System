@@ -1,23 +1,13 @@
-import argparse
-import getpass
 import sys
 
 from pydantic import ValidationError
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.errors import ApiError
+from app.cli.common import InputError, SafeArgumentParser, read_password
 from app.db.session import close_database
 from app.schemas.contracts import AdminBootstrapRequest
 from app.services.accounts import bootstrap_admin
-
-
-class SafeArgumentParser(argparse.ArgumentParser):
-    def error(self, message: str) -> None:
-        self.exit(2, "命令参数无效，请使用 --help 查看用法。\n")
-
-
-class InputError(ValueError):
-    pass
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -28,17 +18,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--password-stdin", action="store_true", help="从标准输入读取单行密码，用于自动化环境")
     args = parser.parse_args(argv)
     try:
-        if args.password_stdin:
-            password = sys.stdin.read(1025).removesuffix("\n").removesuffix("\r")
-            if "\n" in password or "\r" in password:
-                raise InputError("标准输入必须只包含一行密码。")
-        else:
-            if not sys.stdin.isatty():
-                raise InputError("交互输入需要终端；自动化环境请显式使用 --password-stdin。")
-            password = getpass.getpass("管理员密码：")
-            confirmation = getpass.getpass("再次输入密码：")
-            if password != confirmation:
-                raise InputError("两次密码输入不一致。")
+        password = read_password(args.password_stdin, confirm=True)
         body = AdminBootstrapRequest(username=args.username, email=args.email, password=password, real_name=args.real_name)
         user = bootstrap_admin(body)
         print(f"管理员初始化完成，用户编号：{user.id}")

@@ -13,6 +13,7 @@ from app.db.models import AppUser, Base, ClassSession, Course, EmojiRecord, Teac
 from app.db.session import transaction
 
 DIRECTORY = Path(__file__).resolve().parents[3] / "infra/database"
+VERSIONS = [item.version for item in load_migrations(DIRECTORY)]
 
 
 def seed(engine):
@@ -26,14 +27,14 @@ def seed(engine):
         session.add(course)
         session.flush()
         now = datetime.now(timezone.utc)
-        classroom = ClassSession(course_id=course.id, starts_at=now, ends_at=now + timedelta(hours=1), room="101", class_name="测试班")
+        classroom = ClassSession(course_id=course.id, teacher_id=teacher.id, starts_at=now, ends_at=now + timedelta(hours=1), room="101", class_name="测试班")
         session.add(classroom)
         session.flush()
     return factory, student.id, classroom.id
 
 
 def test_fresh_database_repeat_and_orm_schema(database):
-    assert migrate(database, DIRECTORY) == ["001", "002", "003", "004"]
+    assert migrate(database, DIRECTORY) == VERSIONS
     assert migrate(database, DIRECTORY) == []
     inspector = inspect(database)
     assert set(inspector.get_table_names()) == set(Base.metadata.tables) | {"schema_migration"}
@@ -58,13 +59,14 @@ def test_upgrade_legacy_preserves_records_and_teacher_role(database, version):
         course_id = connection.scalar(text("INSERT INTO course(name, teacher_id) VALUES ('数据库', :teacher) RETURNING id"), {"teacher": teacher_id})
         classroom_id = connection.scalar(text("INSERT INTO class_session(course_id, starts_at, ends_at, room, class_name) VALUES (:course, now(), now() + interval '1 hour', '101', '测试班') RETURNING id"), {"course": course_id})
         record_id = connection.scalar(text("INSERT INTO emoji_record(session_id, emotion, source, confidence, device_id) VALUES (:classroom, 'HAPPY', 'AI', 0.9, 'test-camera') RETURNING id"), {"classroom": classroom_id})
-    assert migrate(database, DIRECTORY) == [f"{index:03}" for index in range(version + 1, 5)]
+    assert migrate(database, DIRECTORY) == VERSIONS[version:]
     assert migrate(database, DIRECTORY) == []
     with database.connect() as connection:
         assert connection.scalar(text("SELECT id FROM emoji_record")) == record_id
+        assert connection.scalar(text("SELECT teacher_id FROM class_session WHERE id = :classroom"), {"classroom": classroom_id}) == teacher_id
         assert connection.scalar(text("SELECT status FROM teacher_application WHERE user_id = :user"), {"user": teacher_id}) == "APPROVED"
         assert connection.scalar(text("SELECT role FROM app_user WHERE id = :user"), {"user": teacher_id}) == "TEACHER"
-        assert connection.scalar(text("SELECT count(*) FROM schema_migration")) == 4
+        assert connection.scalar(text("SELECT count(*) FROM schema_migration")) == len(VERSIONS)
 
 
 def test_unknown_legacy_schema_is_not_stamped(database):
@@ -74,6 +76,20 @@ def test_unknown_legacy_schema_is_not_stamped(database):
     with pytest.raises(MigrationError, match="旧库结构"):
         migrate(database, DIRECTORY)
     assert "schema_migration" not in inspect(database).get_table_names()
+
+
+def test_upgrade_from_tracked_foundation_preserves_classroom_and_backfills_teacher(database, tmp_path):
+    for path in sorted(DIRECTORY.glob("*.sql"))[:4]:
+        (tmp_path / path.name).write_bytes(path.read_bytes())
+    assert migrate(database, tmp_path) == VERSIONS[:4]
+    with database.begin() as connection:
+        teacher = connection.scalar(text("INSERT INTO app_user(username, password_hash, email, role) VALUES ('teacher', 'synthetic-hash', 'teacher@example.edu', 'TEACHER') RETURNING id"))
+        course = connection.scalar(text("INSERT INTO course(name, teacher_id) VALUES ('数据库', :teacher) RETURNING id"), {"teacher": teacher})
+        classroom = connection.scalar(text("INSERT INTO class_session(course_id, starts_at, ends_at, room, class_name) VALUES (:course, now(), now() + interval '1 hour', '101', '测试班') RETURNING id"), {"course": course})
+    assert migrate(database, DIRECTORY) == VERSIONS[4:]
+    with database.connect() as connection:
+        assert connection.scalar(text("SELECT teacher_id FROM class_session WHERE id = :classroom"), {"classroom": classroom}) == teacher
+    assert migrate(database, DIRECTORY) == []
 
 
 def test_constraint_failure_preserves_legacy_data_and_can_resume(database):
@@ -93,7 +109,7 @@ def test_constraint_failure_preserves_legacy_data_and_can_resume(database):
     assert "teacher_application" not in inspect(database).get_table_names()
     with database.begin() as connection:
         connection.execute(text("UPDATE emoji_record SET emotion = 'HAPPY' WHERE id = :record"), {"record": record})
-    assert migrate(database, DIRECTORY) == ["004"]
+    assert migrate(database, DIRECTORY) == VERSIONS[3:]
 
 
 def copy_migrations(tmp_path):
@@ -111,15 +127,16 @@ def test_checksum_failure_and_atomic_retry(database, tmp_path):
     with pytest.raises(MigrationError, match="文件被修改"):
         migrate(database, directory)
     path.write_text(original, encoding="utf-8")
-    future = directory / "005_test.sql"
+    next_version = f"{len(VERSIONS) + 1:03}"
+    future = directory / f"{next_version}_test.sql"
     future.write_text("CREATE TABLE migration_probe(id integer); SELECT 1 / 0;")
     with pytest.raises(DBAPIError):
         migrate(database, directory)
     assert "migration_probe" not in inspect(database).get_table_names()
     with database.connect() as connection:
-        assert connection.scalar(text("SELECT count(*) FROM schema_migration")) == 4
+        assert connection.scalar(text("SELECT count(*) FROM schema_migration")) == len(VERSIONS)
     future.write_text("CREATE TABLE migration_probe(id integer);")
-    assert migrate(database, directory) == ["005"]
+    assert migrate(database, directory) == [next_version]
 
 
 def test_migration_lock_and_unknown_version(database):
@@ -132,7 +149,7 @@ def test_migration_lock_and_unknown_version(database):
             holder.execute(text("SELECT pg_advisory_unlock(:id)"), {"id": LOCK_ID})
     migrate(database, DIRECTORY)
     with database.begin() as connection:
-        connection.exec_driver_sql("UPDATE schema_migration SET version = '005' WHERE version = '004'")
+        connection.execute(text("UPDATE schema_migration SET version = :unknown WHERE version = :latest"), {"unknown": f"{len(VERSIONS) + 1:03}", "latest": VERSIONS[-1]})
     with pytest.raises(MigrationError, match="版本未知"):
         migrate(database, DIRECTORY)
 

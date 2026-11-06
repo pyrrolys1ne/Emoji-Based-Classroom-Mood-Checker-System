@@ -5,6 +5,13 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.engine import make_url
 from sqlalchemy.pool import NullPool
+from sqlalchemy.orm import sessionmaker
+from fastapi.testclient import TestClient
+
+from app.core.config import get_settings
+from app.db.migrate import migrate
+from app.db.session import close_database
+from app.main import app
 
 
 @pytest.fixture
@@ -26,3 +33,18 @@ def database():
         with admin.connect() as connection:
             connection.exec_driver_sql(f'DROP DATABASE "{name}" WITH (FORCE)')
         admin.dispose()
+
+
+@pytest.fixture
+def api(database, monkeypatch):
+    migrate(database)
+    close_database()
+    get_settings.cache_clear()
+    monkeypatch.setenv("MOOD_DATABASE_URL", database.url.render_as_string(hide_password=False))
+    monkeypatch.setenv("MOOD_AI_SERVICE_TOKEN", "synthetic-ai-service")
+    monkeypatch.setenv("MOOD_AI_CONTROL_TOKEN", "synthetic-ai-control")
+    monkeypatch.setenv("MOOD_USER_SESSION_TTL_SECONDS", "28800")
+    with TestClient(app, raise_server_exceptions=False) as client:
+        yield client, sessionmaker(bind=database, expire_on_commit=False), database
+    close_database()
+    get_settings.cache_clear()

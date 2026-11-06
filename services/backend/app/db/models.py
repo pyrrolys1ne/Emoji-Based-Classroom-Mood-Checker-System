@@ -45,8 +45,10 @@ class ClassSession(Identity, Base):
     __table_args__ = (
         CheckConstraint("ends_at > starts_at", name="session_time_order"),
         Index("session_course_time_idx", "course_id", "starts_at"),
+        Index("session_teacher_time_idx", "teacher_id", "starts_at"),
     )
     course_id: Mapped[UUID] = mapped_column(ForeignKey("course.id"))
+    teacher_id: Mapped[UUID] = mapped_column(ForeignKey("app_user.id"))
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     room: Mapped[str] = mapped_column(String(100))
@@ -59,6 +61,12 @@ class ScheduleUser(Identity, Base):
     session_id: Mapped[UUID] = mapped_column(ForeignKey("class_session.id"))
     user_id: Mapped[UUID] = mapped_column(ForeignKey("app_user.id"))
     scheduled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"))
+
+
+class ClassroomImport(Identity, Base):
+    __tablename__ = "classroom_import"
+    actor_id: Mapped[UUID] = mapped_column(ForeignKey("app_user.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"))
 
 
 class EmojiRecord(Identity, Base):

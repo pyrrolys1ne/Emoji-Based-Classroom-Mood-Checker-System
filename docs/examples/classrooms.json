@@ -1,0 +1,20 @@
+{
+  "importId": "11111111-1111-4111-8111-111111111111",
+  "courses": [
+    {
+      "key": "software-engineering",
+      "name": "软件工程",
+      "teacherUsername": "teacher-a"
+    }
+  ],
+  "sessions": [
+    {
+      "courseKey": "software-engineering",
+      "startsAt": "2027-01-01T09:00:00+08:00",
+      "endsAt": "2027-01-01T10:00:00+08:00",
+      "room": "实训室 101",
+      "className": "示例班级",
+      "studentUsernames": ["student-a", "student-b"]
+    }
+  ]
+}

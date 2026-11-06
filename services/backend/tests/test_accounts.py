@@ -13,13 +13,11 @@ import pytest
 from argon2 import PasswordHasher
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select, text
-from sqlalchemy.orm import sessionmaker
 
 from app.core.config import get_settings
 from app.core.domain import Role, UserStatus
 from app.core.errors import ApiError
 from app.core.passwords import hash_password, verify_password
-from app.db.migrate import migrate
 from app.db.models import AppUser, AuditLog, TeacherApplication, UserSession, WsTicket
 from app.db.session import close_database
 from app.main import app
@@ -32,17 +30,8 @@ ROOT = Path(__file__).resolve().parents[3]
 
 
 @pytest.fixture
-def auth(database, monkeypatch):
-    migrate(database)
-    close_database()
-    get_settings.cache_clear()
-    monkeypatch.setenv("MOOD_DATABASE_URL", database.url.render_as_string(hide_password=False))
-    monkeypatch.setenv("MOOD_AI_SERVICE_TOKEN", "synthetic-ai-service")
-    monkeypatch.setenv("MOOD_AI_CONTROL_TOKEN", "synthetic-ai-control")
-    with TestClient(app, raise_server_exceptions=False) as client:
-        yield client, sessionmaker(bind=database, expire_on_commit=False), database
-    close_database()
-    get_settings.cache_clear()
+def auth(api):
+    return api
 
 
 def register(client, username="student", **extra):
@@ -251,7 +240,8 @@ def test_student_role_cannot_use_management_and_unimplemented_business_stays_pen
     for path in ("/api/admin/users", "/api/admin/teacher-applications", "/api/admin/emoji/export", "/api/admin/statistics", "/api/emoji/statistics"):
         assert client.get(path, headers=student).status_code == 403
     assert client.post(f"/api/admin/sessions/{uuid4()}/schedule", headers=student, json={"userIds": []}).status_code == 403
-    assert client.get("/api/sessions", headers=student).status_code == 501
+    response = client.get("/api/sessions", headers=student)
+    assert response.status_code == 200 and response.json()["data"] == []
     assert client.post("/api/emoji", headers={**student, "Idempotency-Key": "event"}, json={"sessionId": str(uuid4()), "emotion": "HAPPY"}).status_code == 501
     assert client.get("/api/emoji/history", headers=student).status_code == 501
 

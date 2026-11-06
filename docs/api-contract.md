@@ -1,8 +1,22 @@
 # API 协作草案
 
+## v0.7 课程课堂与学生安排
+
+正式后端已实现课程查询与创建修改、课堂创建修改、学生资料维护、名单替换和按角色过滤的课堂查询，接口与初始化文件见 [课程课堂说明](backend-classrooms.md)。成功列表为数组，写操作在数据库及审计提交后返回成功。
+
+- 新增 `GET/POST /api/admin/courses`、`PUT /api/admin/courses/{course_id}`、`POST /api/admin/sessions`、`PUT /api/admin/sessions/{session_id}`、`PUT /api/admin/users/{user_id}/student-profile`；仅管理员可用。学生资料写入返回 User，课程写入返回 Course，课堂写入返回 ClassSession。
+- 既有 `GET /api/sessions` 和 `POST /api/admin/sessions/{session_id}/schedule` 已实现；名单替换成功 data 为 null，最多 500 个 UUID，重复值去重，空数组清空。只能新安排启用且符合学生身份的账号，无效输入返回 422 INVALID_STUDENT 并保留原名单。
+- ClassSession 新增实际任课 teacherId 和 scheduledStudents。课堂教师独立于课程默认教师；迁移 005 按原课程教师回填，之后修改课程默认教师不改变已有课堂权限。SessionRequest 新增可选 teacherId：新建省略时用课程默认教师，修改省略时保留原任课人，显式 null 返回 422。教师必须启用且已获 APPROVED，否则返回 422 INVALID_TEACHER。
+- 管理员获取全部课堂；教师按课堂实际 teacherId 过滤；学生仅获取被安排课堂，且 scheduledUserIds 与 scheduledStudents 仅包含本人。教师和管理员的名单摘要为 `{id,username,studentNo,realName,className,status}`，不包含邮箱、哈希或令牌。课堂按 startsAt、id 升序，范围和名单同一 SQL 查询读取。
+- 课堂开始或已有记录后禁止修改课程、教师与起止时间，返回 409 CLASSROOM_LOCKED；在其他参数合法时可更正教室、班级。未来且无记录的课堂可调整。名单更新与班级资料维护不删除或转移历史记录，也不按学生所属班级自动安排。
+- 学生资料至少提交一个允许字段，省略保留，null 清空，学号唯一；冲突返回 409 STUDENT_NO_EXISTS。管理接口不接受 role、status、email 等额外字段，不赋予管理员或教师权限。
+- `app.cli.import_classrooms` 通过密码验证管理员，使用稳定 importId 原子创建课程、课堂、名单和审计。重复批次返回 IMPORT_ALREADY_EXISTS，失败不保留批次编号；不自动创建账号、不发放用户令牌、不生成情绪记录。
+
+TypeScript 的新增课堂字段保持可选，以兼容演示和独立联调服务；正式响应包含 teacherId 和 scheduledStudents，Python 请求模型、数据库迁移和客户端校验同步。手动反馈、历史、统计、导出、AI 入库及实时功能仍待实现。
+
 ## v0.6 账号与权限
 
-正式后端已实现注册、登录、改密、注销、本人信息、管理员用户目录、教师申请查询与审核；实现和运行方法见 [账号认证与教师审批](backend-auth.md)。JSON 与共享 User、AuthSession、TeacherApplication 类型保持一致，成功响应及错误均为统一包装。
+正式后端已实现注册、登录、改密、注销、本人信息、管理员用户目录、教师申请查询与审核；实现和运行方法见 [账号认证与教师审批](backend-auth.md)。JSON 与共享 User、AuthSession、TeacherApplication 类型保持一致，成功响应及错误均为统一包装。与本节重复的业务状态以 v0.7 为准。
 
 - 注册、改密和注销成功 data 为 null；登录成功为 `{token,user}`；本人信息为 User；目录为 User 数组；申请查询为 TeacherApplication 数组，审核返回更新后的 TeacherApplication。
 - 公开 TEACHER 注册创建 STUDENT 用户与 PENDING 申请，不发放会话；待审核或驳回不能登录。管理员只能批准或驳回 PENDING，批准原子授予 TEACHER；不能通过请求授予 ADMIN。重复审核返回 409 CONFLICT。
@@ -12,11 +26,11 @@
 - 账号成功响应设置 Cache-Control: no-store；数据库连接故障返回 503 UNAVAILABLE。关键写操作与审计同事务，失败不会返回成功。
 - 用户名去除首尾空白且区分大小写；邮箱做格式校验和域名规范化后按保存值唯一。输入长度与学生字段沿用 v0.5。AI 入库令牌和控制令牌不得使用保留前缀 usr_。
 
-`GET /api/admin/teacher-applications`、`PUT /api/admin/teacher-applications/{application_id}` 已注册，仅管理员可用。学生不能访问用户目录、审批、统计、看板和导出；教师不能安排学生或导出；手动反馈仅限学生。课堂范围、反馈、统计、导出及 AI 入库业务仍返回 501，WebSocket 仍拒绝连接，不代表这些功能已经完成。
+`GET /api/admin/teacher-applications`、`PUT /api/admin/teacher-applications/{application_id}` 已注册，仅管理员可用。学生不能访问用户目录、审批、统计、看板和导出；教师不能安排学生或导出；手动反馈仅限学生。反馈、历史、统计、导出及 AI 入库业务仍返回 501，WebSocket 仍拒绝连接。
 
 ## v0.5 后端基础契约
 
-本节定义后端基础契约，与 v0.6 重复的实现状态以 v0.6 为准。正式后端已有请求校验、响应模型、数据库模型与迁移；课堂、反馈、统计和导出业务仍未实现。数据库与配置见 [后端数据库说明](backend-database.md)。
+本节定义后端基础契约，与较新版本重复的实现状态以最新版本为准。正式后端已有请求校验、响应模型、数据库模型与迁移；反馈、历史、统计和导出业务仍未实现。数据库与配置见 [后端数据库说明](backend-database.md)。
 
 ### 账号与角色
 
@@ -42,7 +56,7 @@
 
 ### 新增管理接口约定
 
-以下为管理接口约定；教师申请查询与审核已经实现，其余尚未注册路由。
+以下管理接口均已实现，当前响应与课堂教师扩展以 v0.7 为准。
 
 | 接口                                                              | 请求与范围                                                                           |
 | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
