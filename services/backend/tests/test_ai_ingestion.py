@@ -336,7 +336,7 @@ else:
             assert client.get("/emoji/history", headers=actors["headers"]["teacher-a"]).json()["data"] == rows
             replay = client.post("/ai/emoji-results", headers={**AI_HEADERS, "Idempotency-Key": "filtered-restart"}, json=payload(classroom, confidence=0.1))
             assert replay.json()["data"] == low.json()["data"]
-            assert client.get("/emoji/statistics", headers=actors["headers"]["teacher-a"]).status_code == 501
+            assert client.get("/emoji/statistics", headers=actors["headers"]["teacher-a"]).json()["data"]["total"] == 0
     finally:
         if process is not None:
             stop(process)

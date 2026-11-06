@@ -20,11 +20,11 @@ export function saveAuth(session: AuthSession | null) {
   else sessionStorage.removeItem(key);
 }
 
-export async function request<T>(
+async function fetchResponse(
   path: string,
   init: RequestInit = {},
   timeoutMs = 10000,
-): Promise<T> {
+): Promise<Response> {
   const token = cachedAuth()?.token;
   const response = await fetch(`${apiBase}${path}`, {
     ...init,
@@ -37,12 +37,32 @@ export async function request<T>(
       ...init.headers,
     },
   });
-  const body = (await response.json().catch(() => null)) as ApiResponse<T> | null;
   if (response.status === 401 && !path.startsWith('/auth/login')) {
     saveAuth(null);
     window.dispatchEvent(new Event('mood:unauthorized'));
   }
+  return response;
+}
+
+export async function request<T>(
+  path: string,
+  init: RequestInit = {},
+  timeoutMs = 10000,
+): Promise<T> {
+  const response = await fetchResponse(path, init, timeoutMs);
+  const body = (await response.json().catch(() => null)) as ApiResponse<T> | null;
   if (!response.ok || !body || body.code !== 'OK')
     throw new Error(body?.message ?? `请求失败（HTTP ${response.status}）`);
   return body.data;
+}
+
+export async function requestCsv(path: string, signal?: AbortSignal): Promise<Blob> {
+  const response = await fetchResponse(path, { signal }, 30000);
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.message ?? `导出失败（HTTP ${response.status}）`);
+  }
+  if (response.headers.get('Content-Type')?.split(';')[0].trim() !== 'text/csv')
+    throw new Error('服务返回的 CSV 格式无效。');
+  return response.blob();
 }

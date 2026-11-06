@@ -1,6 +1,6 @@
 # 手动反馈与历史
 
-正式后端使用 PostgreSQL 保存手动反馈、幂等键和审计。启动、账号和课堂初始化分别见 [数据库说明](backend-database.md)、[账号说明](backend-auth.md)、[课堂说明](backend-classrooms.md)。应用健康接口 stage 为 `ai-ingestion`；基础统计、实时看板和导出仍未开放，AI 接口见 [匿名 AI 入库](backend-ai-ingestion.md)。
+正式后端使用 PostgreSQL 保存手动反馈、幂等键和审计。启动、账号和课堂初始化分别见 [数据库说明](backend-database.md)、[账号说明](backend-auth.md)、[课堂说明](backend-classrooms.md)。应用健康接口 stage 为 `statistics`；全量统计与 CSV 见 [统计导出](backend-statistics.md)，AI 接口见 [匿名 AI 入库](backend-ai-ingestion.md)，实时看板仍未开放。
 
 ## 提交
 
@@ -32,7 +32,7 @@ GET /api/emoji/history?sessionId=<课堂编号>&source=MANUAL&from=2026-11-06T00
 Authorization: Bearer <用户令牌>
 ```
 
-成功 data 为完整 EmojiRecord 数组，按 `recordedAt DESC,id DESC` 排序，不静默截断；空结果为 `[]`。过滤项为 `sessionId`、`userId`、`course`（课程 UUID）、`class`（课堂班级精确匹配）、`from`、`to`、`source`（MANUAL、AI、ALL，默认 ALL）。所有过滤与角色范围取交集；时间带时区并按实际时间比较，起点包含、终点不包含。非法或未知参数返回 422。
+成功 data 为完整 EmojiRecord 数组，按 `recordedAt DESC,id DESC` 排序，不静默截断；空结果为 `[]`。过滤项为 `sessionId`、`userId`、`course`（课程 UUID）、`class`（课堂班级精确匹配）、`from`、`to`、`source`（MANUAL、AI、ALL，默认 ALL）、`emotion`（共享情绪枚举）。所有过滤与角色范围取交集；时间带时区并按实际时间比较，起点包含、终点不包含。非法或未知参数返回 422。
 
 | 身份   | 可见范围                                                                  |
 | ------ | ------------------------------------------------------------------------- |

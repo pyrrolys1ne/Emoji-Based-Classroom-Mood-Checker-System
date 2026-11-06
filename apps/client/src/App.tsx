@@ -73,6 +73,8 @@ function Workspace({
           statistics={data.statistics}
           statisticsLoading={data.statisticsLoading}
           statisticsError={data.statisticsError}
+          statisticsSource={data.statisticsSource}
+          onStatisticsSourceChange={data.selectStatisticsSource}
         />
       ) : page === 'history' ? (
         <HistoryView {...historyProps} />

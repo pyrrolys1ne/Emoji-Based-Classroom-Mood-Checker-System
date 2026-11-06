@@ -78,11 +78,32 @@ export interface RecordFilters {
   from?: string;
   to?: string;
   source?: SourceFilter;
+  emotion?: Emotion;
 }
 export interface EmotionStatistics {
   total: number;
   distribution: Record<Emotion, number>;
   source?: SourceFilter;
+}
+export interface StatisticsBucket {
+  startsAt: string;
+  endsAt: string;
+  total: number;
+}
+export interface StatisticsGroup {
+  courseId: string;
+  courseName: string;
+  className: string;
+  total: number;
+  manual: number;
+  ai: number;
+}
+export interface MultidimensionalStatistics extends EmotionStatistics {
+  timeline: StatisticsBucket[];
+  groups: StatisticsGroup[];
+}
+export interface ExportFilters extends RecordFilters {
+  format?: 'csv';
 }
 export interface ClassroomSummary {
   id: string;

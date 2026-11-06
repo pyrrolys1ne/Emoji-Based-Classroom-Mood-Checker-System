@@ -314,7 +314,7 @@ describe('API boundary coverage', () => {
       ['/api/sessions', 'GET'],
       ['/api/emoji', 'POST'],
       ['/api/emoji/history?sessionId=a%2Fb', 'GET'],
-      ['/api/emoji/statistics?sessionId=a%2Fb', 'GET'],
+      ['/api/emoji/statistics?sessionId=a%2Fb&source=MANUAL', 'GET'],
     ]);
     expect(
       calls.slice(0, 2).every((c) => !(c.init.headers as Record<string, string>).Authorization),

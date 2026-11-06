@@ -1,12 +1,31 @@
 import { useId } from 'react';
-import type { EmojiRecord } from '@mood/contracts';
+import {
+  emotions,
+  type EmojiRecord,
+  type EmotionStatistics,
+  type StatisticsBucket,
+} from '@mood/contracts';
 import { distribution } from '../../models/workspace';
 import { timeline } from '../../models/statistics';
 
-export function EmotionChart({ records }: { records: EmojiRecord[] }) {
+export function EmotionChart({
+  records,
+  statistics,
+}: {
+  records: EmojiRecord[];
+  statistics?: EmotionStatistics;
+}) {
+  const items = statistics
+    ? Object.entries(emotions).map(([key, value]) => ({
+        key,
+        ...value,
+        count: statistics.distribution[key as keyof typeof emotions],
+      }))
+    : distribution(records);
+  const total = statistics?.total ?? records.length;
   return (
     <div className="emotion-chart">
-      {distribution(records).map((item) => (
+      {items.map((item) => (
         <div className="emotion-row" key={item.key}>
           <span className="emotion-name">
             {item.emoji} {item.label}
@@ -14,23 +33,39 @@ export function EmotionChart({ records }: { records: EmojiRecord[] }) {
           <div className="bar-track">
             <span
               style={{
-                width: `${records.length ? (item.count / records.length) * 100 : 0}%`,
+                width: `${total ? (item.count / total) * 100 : 0}%`,
                 background: item.color,
               }}
             />
           </div>
           <strong>{item.count}</strong>
-          <span className="muted">
-            {records.length ? Math.round((item.count / records.length) * 100) : 0}%
-          </span>
+          <span className="muted">{total ? Math.round((item.count / total) * 100) : 0}%</span>
         </div>
       ))}
     </div>
   );
 }
 
-export function Trend({ records }: { records: EmojiRecord[] }) {
-  const buckets = timeline(records);
+export function Trend({
+  records,
+  statistics,
+}: {
+  records: EmojiRecord[];
+  statistics?: StatisticsBucket[];
+}) {
+  const buckets = statistics
+    ? statistics.map((bucket) => ({
+        start: Date.parse(bucket.startsAt),
+        end: Date.parse(bucket.endsAt),
+        count: bucket.total,
+        label: new Date(bucket.startsAt).toLocaleString('zh-CN', {
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+      }))
+    : timeline(records);
   const id = useId().replaceAll(':', '');
   if (!buckets.length) return <div className="empty">当前范围暂无情绪趋势数据</div>;
   const max = Math.max(1, ...buckets.map((bucket) => bucket.count));
@@ -86,7 +121,7 @@ export function Trend({ records }: { records: EmojiRecord[] }) {
       </svg>
       <p className="chart-note">
         按实际时间顺序聚合 · 每段 {Math.round((buckets[0].end - buckets[0].start) / 60000)} 分钟 ·{' '}
-        {records.length} 条记录
+        {buckets.reduce((sum, bucket) => sum + bucket.count, 0)} 条记录
       </p>
     </div>
   );

@@ -271,15 +271,15 @@ export function createApiRepository(
       if (!Array.isArray(d) || !d.every(record)) throw bad();
       return d;
     },
-    async statistics(t, id, s) {
+    async statistics(t, id, s, source = 'MANUAL') {
       const d = await request(
-        `/emoji/statistics?sessionId=${encodeURIComponent(id)}`,
+        `/emoji/statistics?sessionId=${encodeURIComponent(id)}&source=${source}`,
         'GET',
         t,
         undefined,
         s,
       );
-      if (!stats(d)) throw bad();
+      if (!stats(d) || (d.source !== undefined && d.source !== source)) throw bad();
       return d;
     },
   };
@@ -619,16 +619,18 @@ export function createDemoRepository(
             : u.role === 'TEACHER' && x.teachers[r.sessionId] === u.id),
       );
     },
-    async statistics(t, sessionId, s) {
+    async statistics(t, sessionId, s, source = 'MANUAL') {
       await pause(s);
       const x = await load(s),
         u = auth(x, t);
       if (u.role !== 'TEACHER') return fail('只有任课教师可以查看统计。', 403, 'FORBIDDEN');
       allowed(x, u, sessionId);
-      const records = x.records.filter((r) => r.sessionId === sessionId);
+      const records = x.records.filter(
+        (r) => r.sessionId === sessionId && (source === 'ALL' || r.source === source),
+      );
       const distribution = Object.fromEntries(keys.map((k) => [k, 0])) as Record<Emotion, number>;
       for (const r of records) distribution[r.emotion]++;
-      return { total: records.length, distribution };
+      return { total: records.length, distribution, source };
     },
   };
   return {

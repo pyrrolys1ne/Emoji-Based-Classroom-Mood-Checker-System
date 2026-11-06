@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { AuthSession, ClassSession, Emotion, EmojiRecord } from '@mood/contracts';
+import type {
+  AuthSession,
+  ClassSession,
+  Emotion,
+  EmojiRecord,
+  SourceFilter,
+} from '@mood/contracts';
 import {
   ClientError,
   canSubmitTo,
@@ -24,6 +30,7 @@ export function useClassroom(
   const [statistics, setStatistics] = useState<EmotionStatistics | null>(null);
   const [statisticsLoading, setStatisticsLoading] = useState(false);
   const [statisticsError, setStatisticsError] = useState('');
+  const [statisticsSource, setStatisticsSource] = useState<SourceFilter>('MANUAL');
   const [selectedEmotion, setSelectedEmotion] = useState<Emotion | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -111,7 +118,7 @@ export function useClassroom(
     if (teacher) {
       setStatisticsLoading(true);
       repository
-        .statistics(token, selectedSessionId, abort.signal)
+        .statistics(token, selectedSessionId, abort.signal, statisticsSource)
         .then((value) => {
           if (active) setStatistics(value);
         })
@@ -132,6 +139,7 @@ export function useClassroom(
     selectedSessionId,
     recordsVersion,
     teacher,
+    statisticsSource,
     sessionsLoading,
     sessionsError,
     expire,
@@ -212,6 +220,8 @@ export function useClassroom(
     statistics,
     statisticsLoading,
     statisticsError,
+    statisticsSource,
+    selectStatisticsSource: setStatisticsSource,
     selectedEmotion,
     submitting,
     submitError,

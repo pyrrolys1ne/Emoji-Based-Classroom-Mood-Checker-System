@@ -6,6 +6,7 @@ import type {
   User,
   RegisterRequest,
   EmotionStatistics,
+  SourceFilter,
 } from '@mood/contracts';
 export type { EmotionStatistics } from '@mood/contracts';
 import type { ReactNode } from 'react';
@@ -50,7 +51,12 @@ export interface ClientRepository {
     requestId?: string,
   ): Promise<void>;
   history(token: string, sessionId?: string, signal?: AbortSignal): Promise<EmojiRecord[]>;
-  statistics(token: string, sessionId: string, signal?: AbortSignal): Promise<EmotionStatistics>;
+  statistics(
+    token: string,
+    sessionId: string,
+    signal?: AbortSignal,
+    source?: SourceFilter,
+  ): Promise<EmotionStatistics>;
 }
 
 export function canSubmitTo(session: ClassSession | null, now = Date.now()): boolean {
@@ -126,6 +132,8 @@ export interface TeacherViewProps extends HistoryViewProps {
   statistics: EmotionStatistics | null;
   statisticsLoading: boolean;
   statisticsError: string;
+  statisticsSource?: SourceFilter;
+  onStatisticsSourceChange?(source: SourceFilter): void;
 }
 export interface AccountViewProps {
   user: User;

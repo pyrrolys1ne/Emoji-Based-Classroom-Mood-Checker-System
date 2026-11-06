@@ -12,6 +12,7 @@ from app.repositories.feedback import FeedbackRepository
 from app.schemas.contracts import EmojiRecord, EmojiSubmission, RecordFilters
 from app.services.accounts import Principal, authorize_actor
 from app.services.record_views import record_response
+from app.services.record_scope import authorize_records
 
 
 def utc_now() -> datetime:
@@ -53,20 +54,7 @@ def submit(principal: Principal, body: EmojiSubmission, key: str) -> EmojiRecord
 
 def history(principal: Principal, filters: RecordFilters) -> list[EmojiRecord]:
     with transaction() as session:
-        actor = authorize_actor(AccountsRepository(session), principal)
+        actor = authorize_records(session, principal, filters)
         repo = FeedbackRepository(session)
-        if actor.role == Role.STUDENT and (
-            filters.user_id not in (None, actor.id) or filters.source == "AI"
-        ):
-            raise ApiError(403, "FORBIDDEN", "学生只能查询本人的手动反馈。")
-        if filters.session_id is not None:
-            classroom = ClassroomsRepository(session).classroom(filters.session_id)
-            if classroom is None:
-                raise ApiError(404, "NOT_FOUND", "课堂不存在。")
-            if (actor.role == Role.TEACHER and classroom.teacher_id != actor.id) or (
-                actor.role == Role.STUDENT and not repo.assigned(classroom.id, actor.id)
-                and not repo.owns_history(classroom.id, actor.id)
-            ):
-                raise ApiError(403, "FORBIDDEN", "无权查询该课堂记录。")
         result = [record_response(row) for row in repo.rows(actor.role, actor.id, filters, allow_simulated=get_settings().allow_simulated_ai)]
     return result

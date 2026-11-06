@@ -210,8 +210,8 @@ def test_teacher_pending_approval_grants_only_teacher_and_rejects_repeated_revie
     assert client.get("/api/admin/emoji/export", headers=teacher_headers).status_code == 403
     assert client.post(f"/api/admin/sessions/{uuid4()}/schedule", headers=teacher_headers, json={"userIds": []}).status_code == 403
     assert client.post("/api/emoji", headers={**teacher_headers, "Idempotency-Key": "event"}, json={"sessionId": str(uuid4()), "emotion": "HAPPY"}).status_code == 403
-    assert client.get("/api/admin/statistics", headers=teacher_headers).status_code == 501
-    assert client.get("/api/emoji/statistics", headers=teacher_headers).status_code == 501
+    assert client.get("/api/admin/statistics", headers=teacher_headers).json()["data"]["total"] == 0
+    assert client.get("/api/emoji/statistics", headers=teacher_headers).json()["data"]["total"] == 0
     assert client.get("/api/admin/teacher-applications", headers=teacher_headers).status_code == 403
     assert client.put(f"/api/admin/teacher-applications/{application['id']}", headers=teacher_headers, json={"decision": "REJECTED"}).status_code == 403
     assert client.put(f"/api/admin/teacher-applications/{application['id']}", headers=admin_headers, json={"decision": "REJECTED"}).status_code == 409

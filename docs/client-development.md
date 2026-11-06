@@ -50,7 +50,7 @@ src/__tests__/         组件与应用状态测试
 e2e/                  浏览器流程、响应式、无障碍及受控 HTTP 测试
 ```
 
-共享情绪、User、ClassSession、EmojiRecord、AuthSession 和 EmotionStatistics 来自 packages/contracts。正式教师统计为 `{total,distribution,source}`，默认 MANUAL，要求九种情绪的非负整数分布与 total 一致；source 可选以兼容联调服务，不能用分页历史替代全量统计。手动提交通过 Idempotency-Key 区分主动新增与失败重试，业务规则见 [API 契约 v0.8](api-contract.md) 与 [手动反馈与历史](backend-feedback.md)。
+共享情绪、User、ClassSession、EmojiRecord、AuthSession 和 EmotionStatistics 来自 packages/contracts。正式教师统计为 `{total,distribution,source}`，默认 MANUAL，要求九种情绪的非负整数分布与 total 一致；source 可选以兼容联调服务，不能用分页历史替代全量统计。手动提交通过 Idempotency-Key 区分主动新增与失败重试，业务规则见 [API 契约 v0.10](api-contract.md) 与 [手动反馈与历史](backend-feedback.md)。
 
 ## 检查与构建
 
@@ -80,3 +80,5 @@ npm run test:e2e --workspace @mood/client -- --project=chromium --project=mobile
 ```
 
 浏览器截图、失败追踪和报告位于 apps/client/test-results 与 apps/client/playwright-report，均忽略提交。截图测试检查 1440×900、390×844 和 320 像素窄屏；手机视口不是实际手机设备验证。完整用例和真实联调通过标准见 [验收清单](client-acceptance.md)。
+
+教师基础统计由正式后端对完整授权集合聚合，支持手动、AI、全部来源切换，默认手动。统计分母是记录条数；选择历史中的学生不改变课堂整体统计。切换来源会中止旧请求，迟到响应不覆盖新结果，接口见 [统计说明](backend-statistics.md)。

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, aliased
 from app.core.domain import RecordSource, Role
 from app.db.models import AppUser, ClassSession, Course, EmojiRecord, ScheduleUser
 from app.schemas.contracts import RecordFilters
+from app.repositories.record_scope import record_predicates
 
 
 class FeedbackRepository:
@@ -46,24 +47,7 @@ class FeedbackRepository:
             .join(teacher, teacher.id == ClassSession.teacher_id)
             .outerjoin(student, student.id == EmojiRecord.user_id)
         )
-        if role == Role.STUDENT:
-            query = query.where(EmojiRecord.user_id == user_id, EmojiRecord.source == RecordSource.MANUAL)
-        elif role == Role.TEACHER:
-            query = query.where(ClassSession.teacher_id == user_id)
-        if not allow_simulated:
-            query = query.where(EmojiRecord.simulated.is_(False))
+        query = query.where(*record_predicates(role, user_id, filters, allow_simulated=allow_simulated))
         if record_id is not None:
             query = query.where(EmojiRecord.id == record_id)
-        for value, column in (
-            (filters.session_id, EmojiRecord.session_id), (filters.user_id, EmojiRecord.user_id),
-            (filters.course, ClassSession.course_id), (filters.class_name, ClassSession.class_name),
-        ):
-            if value is not None:
-                query = query.where(column == value)
-        if filters.from_time is not None:
-            query = query.where(EmojiRecord.recorded_at >= filters.from_time)
-        if filters.to_time is not None:
-            query = query.where(EmojiRecord.recorded_at < filters.to_time)
-        if filters.source != "ALL":
-            query = query.where(EmojiRecord.source == filters.source)
         return self.session.execute(query.order_by(EmojiRecord.recorded_at.desc(), EmojiRecord.id.desc())).all()

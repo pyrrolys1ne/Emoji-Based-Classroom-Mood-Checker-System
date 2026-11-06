@@ -63,6 +63,10 @@ export function exportRecords(data: WorkspaceData, records: EmojiRecord[]) {
   const blob = new Blob(['\uFEFF', rows.map((row) => row.map(csvCell).join(',')).join('\r\n')], {
     type: 'text/csv;charset=utf-8;',
   });
+  saveCsv(blob);
+}
+
+export function saveCsv(blob: Blob) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;

@@ -188,6 +188,7 @@ class RecordFilters(Contract):
     from_time: AwareDatetime | None = Field(default=None, alias="from")
     to_time: AwareDatetime | None = Field(default=None, alias="to")
     source: SourceFilter = SourceFilter.ALL
+    emotion: Emotion | None = None
 
     @model_validator(mode="after")
     def time_order(self):
@@ -292,6 +293,38 @@ class EmotionStatistics(Contract):
     def complete_distribution(self):
         if set(self.distribution) != set(Emotion) or any(value < 0 for value in self.distribution.values()) or sum(self.distribution.values()) != self.total:
             raise ValueError("统计必须包含九种情绪，且分布之和等于总记录数")
+        return self
+
+
+class StatisticsBucket(Contract):
+    starts_at: AwareDatetime
+    ends_at: AwareDatetime
+    total: int = Field(ge=0)
+
+
+class StatisticsGroup(Contract):
+    course_id: UUID
+    course_name: str
+    class_name: str
+    total: int = Field(ge=0)
+    manual: int = Field(ge=0)
+    ai: int = Field(ge=0)
+
+
+class MultidimensionalStatistics(EmotionStatistics):
+    timeline: list[StatisticsBucket]
+    groups: list[StatisticsGroup]
+
+    @model_validator(mode="after")
+    def complete_groups(self):
+        if sum(item.total for item in self.timeline) != self.total or sum(item.total for item in self.groups) != self.total:
+            raise ValueError("时间趋势和课程班级汇总必须覆盖同一全量记录")
+        if any(item.total != item.manual + item.ai for item in self.groups):
+            raise ValueError("分组来源计数之和必须等于总数")
+        if any(item.starts_at >= item.ends_at for item in self.timeline) or any(
+            previous.ends_at != current.starts_at for previous, current in zip(self.timeline, self.timeline[1:])
+        ):
+            raise ValueError("时间桶必须按实际时间顺序连续排列")
         return self
 
 

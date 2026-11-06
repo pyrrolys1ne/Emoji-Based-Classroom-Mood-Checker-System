@@ -541,6 +541,21 @@ export function TeacherView(props: TeacherViewProps) {
             aria-busy={props.statisticsLoading}
           >
             <h2 id="stats-heading">课堂整体分布</h2>
+            <div className="field session-select">
+              <label htmlFor="statistics-source">统计来源</label>
+              <select
+                id="statistics-source"
+                value={props.statisticsSource ?? 'MANUAL'}
+                disabled={!props.onStatisticsSourceChange}
+                onChange={(event) =>
+                  props.onStatisticsSourceChange?.(event.target.value as 'MANUAL' | 'AI' | 'ALL')
+                }
+              >
+                <option value="MANUAL">手动反馈</option>
+                <option value="AI">AI 记录</option>
+                <option value="ALL">全部来源</option>
+              </select>
+            </div>
             {props.statisticsLoading ? (
               <p role="status">正在加载统计…</p>
             ) : props.statisticsError ? (

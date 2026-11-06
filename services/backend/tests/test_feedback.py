@@ -348,7 +348,7 @@ def test_http_login_submit_history_and_restart_persistence(actors):
             assert client.post("/emoji", headers=write_headers, json=body).json()["data"] == saved
             assert client.get("/emoji/history", headers=actors["headers"]["teacher-a"]).json()["data"] == [saved]
             assert client.get("/emoji/history", headers=actors["headers"]["teacher-b"]).json()["data"] == []
-            assert client.get("/emoji/statistics", headers=actors["headers"]["teacher-a"]).status_code == 501
+            assert client.get("/emoji/statistics", headers=actors["headers"]["teacher-a"]).json()["data"]["total"] == 1
             assert client.post("/auth/logout", headers=headers).status_code == 200
             assert client.get("/emoji/history", headers=headers).status_code == 401
     finally:

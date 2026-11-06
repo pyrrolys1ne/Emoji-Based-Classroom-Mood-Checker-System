@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ArrowDownToLine,
   ArrowRight,
@@ -22,10 +22,14 @@ import {
   type EmojiRecord,
   type WorkspaceData,
   type User,
+  type MultidimensionalStatistics,
+  type SourceFilter,
 } from '@mood/contracts';
 import { useWorkspace } from '../controllers/useWorkspace';
-import { exportRecords, sessionRecords, recordUserLabel } from '../models/workspace';
+import { exportRecords, saveCsv, sessionRecords, recordUserLabel } from '../models/workspace';
 import { isDemo, isIntegration } from '../repositories/http';
+import { statisticsRepository } from '../repositories/statisticsRepository';
+import { summarize } from '../models/statistics';
 import { useAuth } from '../controllers/useAuth';
 import { LoginPage } from './LoginPage';
 import { AIPage } from './AIPage';
@@ -217,7 +221,7 @@ function Dashboard({
         <RecordTable
           data={data}
           records={[...records]
-            .sort((a, b) => b.recordedAt.localeCompare(a.recordedAt))
+            .sort((a, b) => Date.parse(b.recordedAt) - Date.parse(a.recordedAt))
             .slice(0, 5)}
         />
       </Panel>
@@ -297,19 +301,63 @@ function RecordsPage({
   data,
   records,
   canExport,
+  sessionId,
 }: {
   data: WorkspaceData;
   records: EmojiRecord[];
   canExport: boolean;
+  sessionId: string;
 }) {
-  const [source, setSource] = useState('');
+  const [source, setSource] = useState<SourceFilter>('MANUAL');
   const [emotion, setEmotion] = useState('');
   const [page, setPage] = useState(1);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState('');
+  const exportController = useRef<AbortController | null>(null);
+  useEffect(() => {
+    setExportError('');
+    return () => {
+      exportController.current?.abort();
+    };
+  }, [sessionId, source, emotion]);
+  const download = async () => {
+    if (!canExport || exportController.current) return;
+    if (isDemo || isIntegration) {
+      exportRecords(data, filtered);
+      return;
+    }
+    const controller = new AbortController();
+    exportController.current = controller;
+    setExporting(true);
+    setExportError('');
+    try {
+      const blob = await statisticsRepository.exportCsv(
+        {
+          sessionId: sessionId || undefined,
+          source,
+          emotion: emotion ? (emotion as keyof typeof emotions) : undefined,
+        },
+        controller.signal,
+      );
+      if (!controller.signal.aborted) saveCsv(blob);
+    } catch (error) {
+      if (!controller.signal.aborted)
+        setExportError(error instanceof Error ? error.message : '导出失败');
+    } finally {
+      if (exportController.current === controller) {
+        exportController.current = null;
+        setExporting(false);
+      }
+    }
+  };
   const filtered = records
     .filter(
-      (record) => (!source || record.source === source) && (!emotion || record.emotion === emotion),
+      (record) =>
+        (source === 'ALL' || record.source === source) && (!emotion || record.emotion === emotion),
     )
-    .sort((a, b) => b.recordedAt.localeCompare(a.recordedAt));
+    .sort(
+      (a, b) => Date.parse(b.recordedAt) - Date.parse(a.recordedAt) || b.id.localeCompare(a.id),
+    );
   const totalPages = Math.max(1, Math.ceil(filtered.length / 10));
   const current = Math.min(page, totalPages);
   return (
@@ -319,24 +367,29 @@ function RecordsPage({
       action={
         <button
           className="button"
-          disabled={!canExport}
-          onClick={() => exportRecords(data, filtered)}
+          disabled={!canExport || exporting}
+          onClick={() => void download()}
         >
           <ArrowDownToLine size={16} />
-          导出 CSV
+          {exporting ? '正在导出…' : '导出 CSV'}
         </button>
       }
     >
+      {exportError && (
+        <p className="error" role="alert">
+          {exportError}
+        </p>
+      )}
       <div className="filters">
         <select
           aria-label="筛选来源"
           value={source}
           onChange={(event) => {
-            setSource(event.target.value);
+            setSource(event.target.value as SourceFilter);
             setPage(1);
           }}
         >
-          <option value="">全部来源</option>
+          <option value="ALL">全部来源</option>
           <option value="MANUAL">手动提交</option>
           <option value="AI">AI 识别</option>
         </select>
@@ -516,32 +569,103 @@ function SessionsPage({
   );
 }
 
-function StatisticsPage({ data, records }: { data: WorkspaceData; records: EmojiRecord[] }) {
+function StatisticsPage({
+  data,
+  records,
+  sessionId,
+}: {
+  data: WorkspaceData;
+  records: EmojiRecord[];
+  sessionId: string;
+}) {
+  const [source, setSource] = useState<SourceFilter>('MANUAL');
   const [course, setCourse] = useState('');
   const [className, setClassName] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const invalid = Boolean(from && to && Date.parse(from) >= Date.parse(to));
   const filtered = records.filter((record) => {
-    const session = data.sessions.find((item) => item.id === record.sessionId);
+    const classroom =
+      record.classroom ?? data.sessions.find((item) => item.id === record.sessionId);
     const timestamp = Date.parse(record.recordedAt);
     return (
       !invalid &&
-      (!course || session?.courseId === course) &&
-      (!className || session?.className === className) &&
+      (source === 'ALL' || record.source === source) &&
+      (!course || classroom?.courseId === course) &&
+      (!className || classroom?.className === className) &&
       (!from || timestamp >= Date.parse(from)) &&
       (!to || timestamp < Date.parse(to))
     );
   });
+  const filters = useMemo(
+    () => ({
+      sessionId: sessionId || undefined,
+      source,
+      course: course || undefined,
+      class: className || undefined,
+      from: from ? new Date(from).toISOString() : undefined,
+      to: to ? new Date(to).toISOString() : undefined,
+    }),
+    [sessionId, source, course, className, from, to],
+  );
+  const queryKey = JSON.stringify(filters);
+  const revision = JSON.stringify([
+    records.map((record) => record.id),
+    data.sessions.map((classroom) => [classroom.id, classroom.courseName, classroom.className]),
+  ]);
+  const [result, setResult] = useState<{
+    key: string;
+    data?: MultidimensionalStatistics;
+    error?: string;
+  }>({ key: '' });
+  useEffect(() => {
+    if (invalid || isDemo || isIntegration) return;
+    const controller = new AbortController();
+    let active = true;
+    setResult({ key: queryKey });
+    statisticsRepository
+      .statistics(filters, controller.signal)
+      .then((value) => {
+        if (active) setResult({ key: queryKey, data: value });
+      })
+      .catch((error) => {
+        if (active && !controller.signal.aborted)
+          setResult({
+            key: queryKey,
+            error: error instanceof Error ? error.message : '统计加载失败',
+          });
+      });
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [filters, queryKey, revision, invalid]);
+  const statistics = invalid
+    ? undefined
+    : isDemo || isIntegration
+      ? summarize(data, filtered, source)
+      : result.key === queryKey
+        ? result.data
+        : undefined;
+  const error = result.key === queryKey ? result.error : '';
   return (
     <>
       <Panel
         title="多维统计"
-        description={`当前筛选共 ${filtered.length} 条情绪记录`}
+        description={
+          statistics
+            ? `当前筛选共 ${statistics.total} 条情绪记录`
+            : invalid
+              ? '请调整时间范围'
+              : error
+                ? '统计加载失败'
+                : '正在加载统计…'
+        }
         action={
           <button
             className="button secondary"
             onClick={() => {
+              setSource('MANUAL');
               setCourse('');
               setClassName('');
               setFrom('');
@@ -554,6 +678,15 @@ function StatisticsPage({ data, records }: { data: WorkspaceData; records: Emoji
       >
         <div className="filters">
           <select
+            aria-label="统计来源"
+            value={source}
+            onChange={(event) => setSource(event.target.value as SourceFilter)}
+          >
+            <option value="MANUAL">手动反馈</option>
+            <option value="AI">AI 记录</option>
+            <option value="ALL">全部来源</option>
+          </select>
+          <select
             aria-label="筛选课程"
             value={course}
             onChange={(event) => setCourse(event.target.value)}
@@ -561,7 +694,7 @@ function StatisticsPage({ data, records }: { data: WorkspaceData; records: Emoji
             <option value="">全部课程</option>
             {[
               ...new Map(
-                data.sessions.map((session) => [session.courseId, session.courseName]),
+                data.sessions.map((classroom) => [classroom.courseId, classroom.courseName]),
               ).entries(),
             ].map(([id, name]) => (
               <option key={id} value={id}>
@@ -575,7 +708,7 @@ function StatisticsPage({ data, records }: { data: WorkspaceData; records: Emoji
             onChange={(event) => setClassName(event.target.value)}
           >
             <option value="">全部班级</option>
-            {[...new Set(data.sessions.map((session) => session.className))].map((name) => (
+            {[...new Set(data.sessions.map((classroom) => classroom.className))].map((name) => (
               <option key={name}>{name}</option>
             ))}
           </select>
@@ -600,56 +733,50 @@ function StatisticsPage({ data, records }: { data: WorkspaceData; records: Emoji
         </div>
         {invalid && <p className="error">结束时间必须晚于开始时间（结束时刻不计入范围）。</p>}
       </Panel>
-      <div className="two-columns">
-        <Panel title="情绪构成">
-          <EmotionChart records={filtered} />
-        </Panel>
-        <Panel title="反馈时间分布">
-          <Trend records={filtered} />
-        </Panel>
-      </div>
-      <Panel title="按课程与班级汇总">
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>课程 / 班级</th>
-                <th>总记录</th>
-                <th>手动提交</th>
-                <th>AI 识别</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                ...new Map(
-                  data.sessions.map((session) => [
-                    `${session.courseId}-${session.className}`,
-                    session,
-                  ]),
-                ).values(),
-              ].map((session) => {
-                const rows = filtered.filter((record) => {
-                  const item = data.sessions.find((value) => value.id === record.sessionId);
-                  return (
-                    item?.courseId === session.courseId && item.className === session.className
-                  );
-                });
-                return (
-                  <tr key={`${session.courseId}-${session.className}`}>
-                    <td>
-                      {session.courseName}
-                      <small>{session.className}</small>
-                    </td>
-                    <td>{rows.length}</td>
-                    <td>{rows.filter((row) => row.source === 'MANUAL').length}</td>
-                    <td>{rows.filter((row) => row.source === 'AI').length}</td>
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+      {statistics && (
+        <>
+          <div className="two-columns">
+            <Panel title="情绪构成">
+              <EmotionChart records={[]} statistics={statistics} />
+            </Panel>
+            <Panel title="反馈时间分布">
+              <Trend records={[]} statistics={statistics.timeline} />
+            </Panel>
+          </div>
+          <Panel title="按课程与班级汇总">
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>课程 / 班级</th>
+                    <th>总记录</th>
+                    <th>手动提交</th>
+                    <th>AI 识别</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </Panel>
+                </thead>
+                <tbody>
+                  {statistics.groups.map((group) => (
+                    <tr key={JSON.stringify([group.courseId, group.className])}>
+                      <td>
+                        {group.courseName}
+                        <small>{group.className}</small>
+                      </td>
+                      <td>{group.total}</td>
+                      <td>{group.manual}</td>
+                      <td>{group.ai}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Panel>
+        </>
+      )}
     </>
   );
 }
@@ -855,12 +982,19 @@ function Workspace({ user, logout }: { user: User; logout: () => Promise<void> }
                 {page === 'dashboard' && <Dashboard data={data} records={records} go={go} />}
                 {page === 'users' && <UsersPage data={data} />}
                 {page === 'records' && (
-                  <RecordsPage data={data} records={records} canExport={user.role === 'ADMIN'} />
+                  <RecordsPage
+                    data={data}
+                    records={records}
+                    sessionId={sessionId}
+                    canExport={user.role === 'ADMIN'}
+                  />
                 )}
                 {page === 'sessions' && (
                   <SessionsPage data={data} save={schedule} canEdit={user.role === 'ADMIN'} />
                 )}
-                {page === 'statistics' && <StatisticsPage data={data} records={records} />}
+                {page === 'statistics' && (
+                  <StatisticsPage data={data} records={records} sessionId={sessionId} />
+                )}
                 {page === 'ai' && user.role === 'ADMIN' && <AIPage sessions={data.sessions} />}
               </div>
             )

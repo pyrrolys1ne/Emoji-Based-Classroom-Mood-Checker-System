@@ -53,8 +53,7 @@ def test_classroom_and_statistics_time_contract():
 
 
 @pytest.mark.parametrize("path", ["/api/emoji/statistics", "/api/admin/statistics", "/api/admin/emoji/export"])
-def test_query_validation_is_exposed_but_business_stays_pending(authorized_contract_client, path):
-    assert authorized_contract_client.get(path).status_code == 501
+def test_statistics_and_export_query_validation(authorized_contract_client, path):
     for params in ({"source": "unknown"}, {"from": "2026-11-06T10:00:00"}, {"from": "2026-11-07T00:00:00Z", "to": "2026-11-06T00:00:00Z"}):
         assert authorized_contract_client.get(path, params=params).status_code == 422
 

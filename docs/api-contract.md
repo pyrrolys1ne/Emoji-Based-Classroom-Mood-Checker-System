@@ -1,5 +1,16 @@
 # API 协作草案
 
+## v0.10 全量统计与 CSV 导出
+
+正式后端已实现 `GET /api/emoji/statistics`、`GET /api/admin/statistics` 和 `GET /api/admin/emoji/export`。统计只允许教师与管理员，CSV 只允许管理员；接口、CSV 列和运行方法见 [统计与导出](backend-statistics.md)。实时看板和 AI 控制代理仍待实现，本节覆盖旧版本的统计与导出状态。
+
+- 统计与 CSV 默认 source=MANUAL，显式 AI 或 ALL 才纳入对应来源。与历史共用服务端授权和过滤条件：sessionId、userId、course、class、from、to、source，新增可选 emotion 同步支持历史、统计和导出。所有条件取交集，时间带时区并采用 `[from,to)`；非法或未知参数返回 422，不能扩大为全量。显式未知课堂返回 404，教师查询其他任课人的课堂返回 403；跨课程筛选与教师范围相交后可为空。
+- 基础统计保持 `{total,distribution,source}`。九种情绪全部返回，空项为 0，总和等于 total；分母是授权范围内同一筛选的记录条数，不是学生人数。教师按课堂实际 teacherId 授权，名单移除不删除历史；学生不能查询统计，AI 令牌不能代替用户令牌。
+- 多维统计新增 timeline 与 groups，类型为 MultidimensionalStatistics。timeline 为 `{startsAt,endsAt,total}[]`，UTC 实际时间升序、连续且起点包含终点不包含；覆盖匹配数据的最早与最晚分钟，按整数分钟自适应为最多 12 桶，空桶计 0，空结果为 []。groups 为 `{courseId,courseName,className,total,manual,ai}[]`，按课程名称、编号和班级稳定排列，仅包含非空分组。趋势、分组、来源计数及总分布来自同一 SQL 快照，合计均等于 total，不使用分页记录计算正式统计。
+- CSV 成功返回 UTF-8 BOM 的 text/csv 文件，不使用 JSON 包装；format 仅允许 csv。列包含记录与课堂编号、学生编号与姓名、学号、课程班级、情绪来源、模型分数、UTC 记录时间、设备标识、模拟标记、提供方和分数类型。AI 学生编号和学号为空，姓名为匿名；DeepSeek self_reported 原样保留，模型分数不是准确率。无数据只导出表头。
+- 导出读取完整授权集合，按 recordedAt DESC、id DESC 稳定排序。所有字段使用 CSV 引号及换行转义，公式前缀 =、+、-、@、制表符、回车、换行及空白/BOM 后的公式前缀均作文本处理。生成与 EMOJI_CSV_EXPORT 审计同事务，成功提交后才返回文件，错误返回统一 JSON；所有响应禁止缓存。
+- 模拟数据继续受 MOOD_ALLOW_SIMULATED_AI 限制，默认排除，隔离环境开启后始终保留标记。正式管理端从服务端读取分布、时间趋势和课程班级汇总，并通过带身份的 CSV 接口下载当前来源、情绪及课堂筛选的全部记录；表格分页不截断导出。演示和独立联调模式继续使用本地全量数据。教师客户端支持 MANUAL、AI、ALL 来源切换，统计来源不改变个人学生筛选或历史归属。
+
 ## v0.9 匿名 AI 入库
 
 正式后端已实现 `POST /api/ai/emoji-results`，使用独立 AI 服务令牌并返回统一包装。请求、错误与运行配置见 [AI 入库说明](backend-ai-ingestion.md)。本节覆盖旧版本 AI 入库状态，统计、导出、实时及 AI 控制代理仍未实现。
