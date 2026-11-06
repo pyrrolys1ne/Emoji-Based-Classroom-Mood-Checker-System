@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { emotions, type AIConfig, type AIStatus, type ClassSession } from '@mood/contracts';
 import { isDemo, request } from '../repositories/http';
 import { VisionImagePanel } from './components/VisionImagePanel';
@@ -18,13 +18,22 @@ export function AIPage({ sessions }: { sessions: ClassSession[] }) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const commandVersion = useRef(0);
+  const commandBusy = useRef(false);
+  const mounted = useRef(false);
   useEffect(() => {
-    if (isDemo) return;
+    mounted.current = true;
+    if (isDemo)
+      return () => {
+        mounted.current = false;
+      };
     let active = true;
     const load = async () => {
+      if (commandBusy.current) return;
+      const version = commandVersion.current;
       try {
         const next = await request<AIStatus>('/admin/ai/status');
-        if (active) {
+        if (active && version === commandVersion.current) {
           setStatus(next);
           setError('');
           if (next.stopReason === 'MAX_SAMPLES') setMessage('已达到采样次数上限，采集已停止。');
@@ -32,7 +41,8 @@ export function AIPage({ sessions }: { sessions: ClassSession[] }) {
           else if (next.stopReason === 'ERROR') setMessage('');
         }
       } catch (reason) {
-        if (active) setError(reason instanceof Error ? reason.message : 'AI 服务不可用');
+        if (active && version === commandVersion.current)
+          setError(reason instanceof Error ? reason.message : 'AI 服务不可用');
       }
     };
     void load();
@@ -41,10 +51,14 @@ export function AIPage({ sessions }: { sessions: ClassSession[] }) {
     }, 3000);
     return () => {
       active = false;
+      mounted.current = false;
       clearInterval(interval);
     };
   }, []);
   const act = async (action: 'start' | 'stop') => {
+    if (commandBusy.current) return;
+    commandBusy.current = true;
+    commandVersion.current += 1;
     setBusy(true);
     setError('');
     setMessage('');
@@ -53,18 +67,31 @@ export function AIPage({ sessions }: { sessions: ClassSession[] }) {
         method: 'POST',
         ...(action === 'start' ? { body: JSON.stringify(config) } : {}),
       });
+      if (!mounted.current) return;
       setStatus(next);
       setMessage(
         action === 'start'
-          ? '采集任务已启动，请查看状态与实时看板。'
+          ? next.running
+            ? '采集任务已启动，请查看状态与实时看板。'
+            : next.stopReason === 'ERROR'
+              ? '任务启动后因错误停止，请核对服务端状态。'
+              : '启动请求已处理，任务已结束，请核对停止原因。'
           : next.running
             ? '正在停止，当前推理结束后释放摄像头。'
             : '采集已停止，尚未发送的结果保留在重试队列。',
       );
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '操作失败');
+      if (!mounted.current) return;
+      setError(
+        reason instanceof Error && ['TimeoutError', 'AbortError'].includes(reason.name)
+          ? '请求未确认，任务可能已执行。请核对状态后决定是否重试。'
+          : reason instanceof Error
+            ? reason.message
+            : '操作失败',
+      );
     } finally {
-      setBusy(false);
+      commandBusy.current = false;
+      if (mounted.current) setBusy(false);
     }
   };
   return (

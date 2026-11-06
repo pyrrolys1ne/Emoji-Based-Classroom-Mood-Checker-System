@@ -175,6 +175,22 @@ export interface AuthSession {
   token: string;
   user: User;
 }
+export interface WsTicketResponse {
+  ticket: string;
+  expiresAt: string;
+}
+export interface RealtimeSnapshot {
+  type: 'snapshot';
+  total: number;
+  latestId: string | null;
+  version?: string;
+}
+export interface RealtimeDashboard {
+  records: EmojiRecord[];
+  total: number;
+  latestId: string | null;
+  updatedAt: string;
+}
 export interface AIConfig {
   sessionId: string;
   mode: 'simulation' | 'camera' | 'camera-api';
@@ -201,7 +217,7 @@ export interface AIStatus {
   apiCalls: number;
   lastInferenceMs: number | null;
   lastInferenceAt: string | null;
-  lastFaces: { emotion: Emotion | null; score: number }[];
+  lastFaces: { emotion: AIEmotion | null; score: number }[];
   stopReason: 'REQUESTED' | 'MAX_SAMPLES' | 'TIME_LIMIT' | 'ERROR' | null;
 }
 
@@ -231,5 +247,5 @@ export interface VisionResult {
   sampleOnly: true;
   persisted: false;
   elapsedMs: number;
-  faces: { label: string; score: number; emotion: Emotion | null }[];
+  faces: { label: string; score: number; emotion: AIEmotion | null }[];
 }

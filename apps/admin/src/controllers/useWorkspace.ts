@@ -10,9 +10,13 @@ export function useWorkspace() {
   const [connection, setConnection] = useState<ConnectionState>('connecting');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const busy = useRef(false);
+  const queued = useRef(false);
   const mounted = useRef(true);
-  const load = useCallback(async () => {
-    if (busy.current) return;
+  const load = useCallback(async function load() {
+    if (busy.current) {
+      queued.current = true;
+      return;
+    }
     busy.current = true;
     try {
       const next = await workspaceRepository.load();
@@ -27,6 +31,10 @@ export function useWorkspace() {
     } finally {
       busy.current = false;
       if (mounted.current) setLoading(false);
+      if (queued.current && mounted.current) {
+        queued.current = false;
+        void load();
+      }
     }
   }, []);
   useEffect(() => {

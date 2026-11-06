@@ -133,6 +133,43 @@ it('revokes the local session on an unauthorized CSV response', async () => {
   expect(dispatch).toHaveBeenCalledOnce();
 });
 
+it.each(['ACCOUNT_DISABLED', 'TEACHER_APPROVAL_REQUIRED'])(
+  '账号被撤销时清理旧数据：%s',
+  async (code) => {
+    const dispatch = authentication();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () => new Response(JSON.stringify({ code, message: '访问被撤销' }), { status: 403 }),
+      ),
+    );
+    await expect(statisticsRepository.exportCsv({})).rejects.toThrow('访问被撤销');
+    expect(dispatch).toHaveBeenCalledOnce();
+  },
+);
+
+it('旧会话的迟到拒绝不能清除刚登录的新会话', async () => {
+  const dispatch = authentication();
+  let release!: (response: Response) => void;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+    ),
+  );
+  const pending = statisticsRepository.exportCsv({});
+  vi.stubGlobal('sessionStorage', {
+    getItem: () => JSON.stringify({ token: 'new-session', user: { id: 'other' } }),
+    removeItem: vi.fn(),
+  });
+  release(new Response(JSON.stringify({ code: 'UNAUTHENTICATED' }), { status: 401 }));
+  await expect(pending).rejects.toThrow();
+  expect(dispatch).not.toHaveBeenCalled();
+});
+
 it('validates source and counters before presenting a server aggregate', async () => {
   authentication();
   vi.stubGlobal(

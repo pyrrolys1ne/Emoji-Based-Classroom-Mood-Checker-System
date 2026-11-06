@@ -1,4 +1,5 @@
-import { apiBase, request } from './http';
+import { apiBase, cachedAuth, request, saveAuth } from './http';
+import type { RealtimeSnapshot, User } from '@mood/contracts';
 
 export type ConnectionState = 'connecting' | 'live' | 'polling' | 'offline';
 
@@ -11,8 +12,25 @@ export function realtimeUrl(
   const url = new URL(endpoint, new URL(api, origin));
   if (url.protocol === 'https:') url.protocol = 'wss:';
   else if (url.protocol === 'http:') url.protocol = 'ws:';
+  if (!['ws:', 'wss:'].includes(url.protocol) || url.username || url.password)
+    throw new Error('实时通道地址无效。');
+  url.search = '';
+  url.hash = '';
   url.searchParams.set('ticket', ticket);
   return url;
+}
+
+export function validSnapshot(value: unknown): value is RealtimeSnapshot {
+  if (!value || typeof value !== 'object') return false;
+  const data = value as RealtimeSnapshot;
+  return (
+    data.type === 'snapshot' &&
+    Number.isSafeInteger(data.total) &&
+    data.total >= 0 &&
+    (data.latestId === null || (typeof data.latestId === 'string' && data.latestId.length > 0)) &&
+    (data.version === undefined ||
+      (typeof data.version === 'string' && /^[a-f0-9]{64}$/.test(data.version)))
+  );
 }
 
 export function subscribeRealtime(
@@ -46,8 +64,8 @@ export function subscribeRealtime(
       nextSocket.onmessage = (event) => {
         try {
           const snapshot = JSON.parse(event.data);
-          if (snapshot.type !== 'snapshot') return;
-          const next = JSON.stringify([snapshot.total, snapshot.latestId]);
+          if (!validSnapshot(snapshot)) return;
+          const next = JSON.stringify([snapshot.total, snapshot.latestId, snapshot.version]);
           if (next !== fingerprint) {
             fingerprint = next;
             void refresh();
@@ -56,8 +74,18 @@ export function subscribeRealtime(
           /* 非法事件不影响轮询兜底。 */
         }
       };
-      nextSocket.onclose = () => {
+      nextSocket.onclose = (event) => {
         clearTimeout(handshakeTimeout);
+        if (event.code === 1008 && !stopped) {
+          void request<User>('/users/me', { signal: abort.signal })
+            .then((user) => {
+              if (!stopped && cachedAuth()?.user.role !== user.role) {
+                saveAuth(null);
+                window.dispatchEvent(new Event('mood:unauthorized'));
+              }
+            })
+            .catch(() => {});
+        }
         retryConnect();
       };
       nextSocket.onerror = () => nextSocket.close();

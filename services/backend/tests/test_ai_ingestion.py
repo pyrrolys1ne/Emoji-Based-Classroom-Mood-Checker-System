@@ -232,7 +232,7 @@ def test_upgrade_backfills_only_existing_keyed_ai_records(database, tmp_path):
         record = connection.scalar(text("INSERT INTO emoji_record(session_id,emotion,source,confidence,device_id,idempotency_key,request_hash) VALUES (:classroom,'HAPPY','AI',0.9,'test-camera','existing-key',:hash) RETURNING id"), {"classroom": classroom, "hash": "a" * 64})
         connection.execute(text("INSERT INTO emoji_record(session_id,user_id,emotion,source,idempotency_key,request_hash) VALUES (:classroom,:teacher,'HAPPY','MANUAL','existing-key',:hash)"), {"classroom": classroom, "teacher": teacher, "hash": "b" * 64})
         connection.execute(text("INSERT INTO emoji_record(session_id,emotion,source,confidence,device_id) VALUES (:classroom,'SAD','AI',0.8,'legacy-camera')"), {"classroom": classroom})
-    assert migrate(database, directory) == ["006"]
+    assert migrate(database, directory) == [item.version for item in load_migrations(directory)[5:]]
     with database.connect() as connection:
         assert connection.execute(text("SELECT idempotency_key,request_hash,record_id,reason FROM ai_ingestion")).one() == ("existing-key", "a" * 64, record, None)
         assert connection.scalar(text("SELECT count(*) FROM emoji_record")) == 3

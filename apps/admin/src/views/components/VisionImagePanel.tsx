@@ -37,7 +37,13 @@ export function VisionImagePanel() {
       );
       setResult(next);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '识图请求失败');
+      setError(
+        reason instanceof Error && ['TimeoutError', 'AbortError'].includes(reason.name)
+          ? '图片请求未确认，推理可能已执行。请核实后再决定是否重新分析。'
+          : reason instanceof Error
+            ? reason.message
+            : '识图请求失败',
+      );
     } finally {
       setBusy(false);
     }

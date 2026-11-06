@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://127.0.0.1:5173", "http://127.0.0.1:5174"]
     user_session_ttl_seconds: int = Field(default=28800, ge=300, le=604800)
     ws_ticket_ttl_seconds: int = Field(default=30, ge=1, le=30)
+    realtime_poll_seconds: float = Field(default=1, ge=0.1, le=5, allow_inf_nan=False)
     ai_service_token: SecretStr = SecretStr("")
     ai_control_token: SecretStr = SecretStr("")
     ai_base_url: str = "http://127.0.0.1:8001"

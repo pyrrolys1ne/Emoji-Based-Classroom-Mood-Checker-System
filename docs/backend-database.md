@@ -44,6 +44,8 @@ AI 幂等键在 AI 来源内唯一，手动幂等键按学生隔离，与 AI 互
 
 统计和 CSV 导出沿用现有记录、索引及审计，无额外迁移。历史、分布、趋势和导出使用相同授权与过滤条件，正式统计在数据库对全量范围聚合，详见 [统计与导出](backend-statistics.md)。
 
+`007_realtime_revision.sql` 为课堂增加 revision 与记录、名单、课程名称、相关用户资料的事务触发器，更新与回滚均随业务事务。既有票据结构接入原子消费，登录会话撤销会关闭实时访问；多进程与重启共享数据库状态，见 [实时与 AI 控制](backend-realtime-ai.md)。
+
 ## 配置
 
 后端读取 `services/backend/.env`，进程环境变量优先。连接字符串必须使用 `postgresql+psycopg` 并指定数据库；URL 中的密码含特殊字符时需要 URL 编码。
@@ -55,7 +57,8 @@ AI 幂等键在 AI 来源内唯一，手动幂等键按学生隔离，与 AI 互
 | `MOOD_DATABASE_MAX_OVERFLOW`    | 5                       | 额外连接数，0—50                                            |
 | `MOOD_DATABASE_POOL_TIMEOUT`    | 10                      | 获取连接超时秒数，1—60                                      |
 | `MOOD_USER_SESSION_TTL_SECONDS` | 28800                   | 用户会话时长，300—604800 秒                                 |
-| `MOOD_WS_TICKET_TTL_SECONDS`    | 30                      | 一次性票据时长，1—30 秒                                     |
+| `MOOD_WS_TICKET_TTL_SECONDS`    | 30                      | 一次性票据时长，1—30 秒，实际不晚于用户会话到期             |
+| `MOOD_REALTIME_POLL_SECONDS`    | 1                       | 活跃连接重新检查身份、课堂与版本的间隔，0.1—5 秒            |
 | `MOOD_AI_SERVICE_TOKEN`         | 空                      | AI 入库令牌；空值禁用入库认证                               |
 | `MOOD_AI_CONTROL_TOKEN`         | 空                      | 管理代理使用的控制令牌，须匹配 AI 服务的 `AI_CONTROL_TOKEN` |
 | `MOOD_AI_BASE_URL`              | `http://127.0.0.1:8001` | 服务端 AI 地址，不能包含凭据、查询参数或片段                |
@@ -73,4 +76,4 @@ cd services/backend
 
 测试环境还需安装 `services/ai/requirements.txt`，用于正式后端与 AI 队列的真实 HTTP 测试，不安装摄像头或模型依赖。设置 `MOOD_TEST_DATABASE_URL` 可运行真实 PostgreSQL 用例，测试连接账号需要创建数据库权限。每个用例创建并清理独立临时库，不清空该变量指向的数据库；未设置时明确跳过。CI 使用独立 PostgreSQL 17 服务执行这些测试。
 
-覆盖空库初始化、原有三个版本升级与数据保留、重复迁移、未知结构拒绝接管、校验和、失败回滚与重试、迁移锁、ORM 结构一致性、事务提交回滚、学号唯一性、并发幂等约束、AI 校验和票据时间约束。模型及约束测试不代表尚未实现的业务接口已通过验收。
+覆盖空库初始化、原有三个版本升级与数据保留、重复迁移、未知结构拒绝接管、校验和、失败回滚与重试、迁移锁、ORM 结构一致性、事务提交回滚、学号唯一性、并发幂等约束、AI 校验和票据时间约束。模型及约束测试不能代替真实模型、摄像头和部署环境验收；实时、控制及跨进程验证范围见 [实时说明](backend-realtime-ai.md)。

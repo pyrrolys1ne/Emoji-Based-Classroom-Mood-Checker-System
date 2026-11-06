@@ -1,6 +1,6 @@
 # 匿名 AI 入库
 
-正式后端通过 `POST /api/ai/emoji-results` 接收独立 AI 服务的匿名结构化结果。接口只保存情绪记录，不接收原始视频帧、人脸图像、人脸特征或用户身份；不会启动摄像头或调用模型。历史权限沿用 [手动反馈与历史](backend-feedback.md)，统计和导出见 [统计导出说明](backend-statistics.md)，实时和 AI 控制代理仍未开放。
+正式后端通过 `POST /api/ai/emoji-results` 接收独立 AI 服务的匿名结构化结果。接口只保存情绪记录，不接收原始视频帧、人脸图像、人脸特征或用户身份；不会启动摄像头或调用模型。历史权限沿用 [手动反馈与历史](backend-feedback.md)，统计和导出见 [统计导出说明](backend-statistics.md)，实时与管理员 AI 控制代理见 [实时说明](backend-realtime-ai.md)。
 
 ## 数据库与配置
 
@@ -9,7 +9,7 @@
 | 后端配置                | AI 服务配置                           | 用途                                                                |
 | ----------------------- | ------------------------------------- | ------------------------------------------------------------------- |
 | MOOD_AI_SERVICE_TOKEN   | AI_SERVICE_TOKEN                      | 同一独立入库令牌；空配置禁用，不使用用户令牌保留前缀 usr_           |
-| MOOD_AI_CONTROL_TOKEN   | AI_CONTROL_TOKEN                      | 独立控制令牌，不能代替入库令牌；正式控制代理仍待实现                |
+| MOOD_AI_CONTROL_TOKEN   | AI_CONTROL_TOKEN                      | 独立控制令牌，不能代替入库令牌；正式控制代理已接入                  |
 | 后端监听地址            | AI_BACKEND_URL                        | AI 连接正式后端的根地址，例如 http://127.0.0.1:8000，不附加 /api    |
 | MOOD_AI_MIN_CONFIDENCE  | /control/start 的 confidenceThreshold | 后端独立校验阈值，默认 0.5；采集端过滤不能替代后端检查              |
 | MOOD_ALLOW_SIMULATED_AI | /control/start 的 mode                | 默认 false；模拟仅在隔离开发数据库显式开启，记录保留 simulated 标记 |

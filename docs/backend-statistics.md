@@ -1,6 +1,6 @@
 # 全量统计与 CSV 导出
 
-正式后端使用 PostgreSQL 对授权范围内的完整记录聚合，统计不依赖历史分页或浏览器已加载行。三类查询共用 [历史接口](backend-feedback.md) 的筛选与权限规则，模拟数据遵守 [AI 入库](backend-ai-ingestion.md) 的隔离配置。健康接口 stage 为 statistics，实时看板与 AI 控制代理仍待实现。
+正式后端使用 PostgreSQL 对授权范围内的完整记录聚合，统计不依赖历史分页或浏览器已加载行。三类查询共用 [历史接口](backend-feedback.md) 的筛选与权限规则，模拟数据遵守 [AI 入库](backend-ai-ingestion.md) 的隔离配置。健康接口 stage 为 realtime-ai-control，实时看板与 AI 控制代理见 [实时说明](backend-realtime-ai.md)。
 
 ## 接口与过滤
 
@@ -58,6 +58,6 @@ CSV 使用 UTF-8 BOM、CRLF 行结束符和标准双引号转义，所有单元�
 
 ## 运行与验证
 
-不新增数据库迁移，沿用 001—006 的记录、索引和审计结构。配置、依赖与测试数据库见 [数据库说明](backend-database.md)。设置 MOOD_TEST_DATABASE_URL 后，在 services/backend 执行 `../../.venv/bin/python -m pytest -q`；测试创建独立临时 PostgreSQL 数据库。
+统计与导出不新增迁移；当前完整数据库版本为 001—007，实时功能所需的 007 升级见 [实时说明](backend-realtime-ai.md)。配置、依赖与测试数据库见 [数据库说明](backend-database.md)。设置 MOOD_TEST_DATABASE_URL 后，在 services/backend 执行 `../../.venv/bin/python -m pytest -q`；测试创建独立临时 PostgreSQL 数据库。
 
 验证包括角色与课堂范围、名单移除、来源与模拟隔离、九种情绪、空结果、UTC 趋势、跨日和时区、半开时间范围、组合过滤、超过 1,000 条记录、统计与 CSV 编号一致、公式防护、引号换行及审计失败。前端执行 `npm run typecheck`、`npm run test:client`、`npm run test:admin`、`npm run build`，验证来源切换、回执格式、CSV 下载和迟到响应处理。

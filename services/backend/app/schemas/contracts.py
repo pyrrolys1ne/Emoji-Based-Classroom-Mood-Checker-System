@@ -339,6 +339,30 @@ class AIFiltered(Contract):
     reason: Literal["LOW_CONFIDENCE"]
 
 
+class WsTicketResponse(Contract):
+    ticket: str = Field(repr=False)
+    expires_at: AwareDatetime
+
+
+class DashboardConnection(Contract):
+    ticket: str = Field(pattern=r"^wst_[A-Za-z0-9_-]{43}$", repr=False)
+    session_id: UUID | None = None
+
+
+class RealtimeSnapshot(Contract):
+    type: Literal["snapshot"] = "snapshot"
+    total: int = Field(ge=0)
+    latest_id: UUID | None
+    version: str
+
+
+class RealtimeDashboard(Contract):
+    records: list[EmojiRecord]
+    total: int = Field(ge=0)
+    latest_id: UUID | None
+    updated_at: AwareDatetime
+
+
 T = TypeVar("T")
 
 

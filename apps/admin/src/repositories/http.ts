@@ -37,7 +37,19 @@ async function fetchResponse(
       ...init.headers,
     },
   });
-  if (response.status === 401 && !path.startsWith('/auth/login')) {
+  const forbidden =
+    response.status === 403
+      ? await response
+          .clone()
+          .json()
+          .catch(() => null)
+      : null;
+  if (
+    cachedAuth()?.token === token &&
+    !path.startsWith('/auth/login') &&
+    (response.status === 401 ||
+      ['ACCOUNT_DISABLED', 'TEACHER_APPROVAL_REQUIRED'].includes(forbidden?.code))
+  ) {
     saveAuth(null);
     window.dispatchEvent(new Event('mood:unauthorized'));
   }

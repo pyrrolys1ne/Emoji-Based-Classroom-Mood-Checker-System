@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, Double, Enum, ForeignKey, Index, String, Text, UniqueConstraint, text
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, DateTime, Double, Enum, ForeignKey, Index, String, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -44,10 +44,12 @@ class ClassSession(Identity, Base):
     __tablename__ = "class_session"
     __table_args__ = (
         CheckConstraint("ends_at > starts_at", name="session_time_order"),
+        CheckConstraint("revision >= 0", name="session_revision_check"),
         Index("session_course_time_idx", "course_id", "starts_at"),
         Index("session_teacher_time_idx", "teacher_id", "starts_at"),
     )
     course_id: Mapped[UUID] = mapped_column(ForeignKey("course.id"))
+    revision: Mapped[int] = mapped_column(BigInteger, server_default=text("0"))
     teacher_id: Mapped[UUID] = mapped_column(ForeignKey("app_user.id"))
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

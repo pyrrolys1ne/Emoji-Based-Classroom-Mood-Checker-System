@@ -1,5 +1,19 @@
 # API 协作草案
 
+## v0.11 实时授权与 AI 控制代理
+
+正式后端已实现短期一次性票据、WebSocket 刷新通知、HTTP 实时快照及管理员 AI 控制代理；运行方法与错误语义见 [实时看板与 AI 控制](backend-realtime-ai.md)。本节覆盖旧版本的实现状态，真实模型、摄像头与部署环境仍须独立验收。
+
+- `POST /api/auth/ws-ticket` 仅教师、管理员可用，data 为 `{ticket,expiresAt}`。随机票据只保存摘要，绑定当前用户会话，默认 30 秒且不晚于会话到期；数据库原子消费，跨进程不可重放。
+- `WebSocket /ws/dashboard?ticket=...&sessionId=...` 校验精确 Origin、票据、当前会话与角色；sessionId 可省略，显式课堂受实际任课范围限制。只允许 ticket 和可选 sessionId，不接受用户访问令牌、重复或其他参数。推送 `{type:"snapshot",total,latestId,version}`，不广播完整用户或课堂记录；version 是可见课堂版本的摘要。1008 表示身份、来源、范围或协议拒绝，1011 表示服务端检查失败。
+- 新增迁移 007，为课堂增加 revision 与事务触发器，覆盖记录、名单、课堂、课程名及相关学生资料；回滚不通知，其他教师范围的变化不改变本人的摘要。默认忽略模拟记录的计数及正式版本，隔离环境开启模拟时通过可见记录计数通知。前端对版本变化重新读取数据，保留断线退避、每次重连换票和 5 秒轮询。
+- 注销撤销当前设备票据和访问，改密撤销全部设备；连接持续重读数据库状态，注销、到期、禁用、角色变化或指定课堂越权后关闭。普通检查间隔为 MOOD_REALTIME_POLL_SECONDS（默认 1 秒，0.1—5 秒）。前端退出清理连接与定时器，账号失效或角色改变时清除旧状态。
+- `GET /api/admin/dashboard/realtime` 仅教师、管理员，支持全部 RecordFilters，source 默认 ALL；data 为 `{records,total,latestId,updatedAt}`。记录为完整授权数组，total 与 latestId 取自该数组，不静默截断。
+- 管理员代理：`GET /api/admin/ai/status`、`POST /api/admin/ai/start`、`POST /api/admin/ai/stop`、`GET /api/admin/ai/vision`、`POST /api/admin/ai/analyze-image`，固定转发到 AI 服务 `/control/*`。仅服务端附加独立控制令牌，不转发用户令牌、不跟随重定向、不自动重试写入或付费推理。
+- start 验证存在且正在进行的课堂，模拟需环境明确允许；AIConfig 各采样参数与独立服务一致，camera-api 必须明确允许远程发送、间隔至少 5 秒、次数 1—60、时长 10—600 秒。stop 允许无请求体或空对象。原始图像、任意 URL、用户编号等额外字段均拒绝。
+- 图片分析只接受 `{imageId,allowRemoteUpload:true}`，样本须在 AI 清单中且已准备、服务已配置；成功结果保留 sampleOnly=true、persisted=false、calibrated=false 和 self_reported。状态、配置、计数、时间和表情映射须符合共享结构；剔除未知字段，原始错误转为固定提示，不能透传密钥、服务令牌、图像或服务端路径。
+- 控制操作先记录 REQUEST 意图，再以相同操作编号记录 SUCCESS、REJECTED 或 UNKNOWN，按数据库锁串行。网络操作与数据库不可共同回滚；超时、无效回执或成功审计失败时明确提示结果可能未知，不能冒充安全失败后自动重放。未配置或不可连接为 503，上游认证或结构错误为 502，超时为 504，忙碌为 409，限流为 429；错误正文不透传上游消息，所有响应禁止缓存。
+
 ## v0.10 全量统计与 CSV 导出
 
 正式后端已实现 `GET /api/emoji/statistics`、`GET /api/admin/statistics` 和 `GET /api/admin/emoji/export`。统计只允许教师与管理员，CSV 只允许管理员；接口、CSV 列和运行方法见 [统计与导出](backend-statistics.md)。实时看板和 AI 控制代理仍待实现，本节覆盖旧版本的统计与导出状态。

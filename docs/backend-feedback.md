@@ -1,6 +1,6 @@
 # 手动反馈与历史
 
-正式后端使用 PostgreSQL 保存手动反馈、幂等键和审计。启动、账号和课堂初始化分别见 [数据库说明](backend-database.md)、[账号说明](backend-auth.md)、[课堂说明](backend-classrooms.md)。应用健康接口 stage 为 `statistics`；全量统计与 CSV 见 [统计导出](backend-statistics.md)，AI 接口见 [匿名 AI 入库](backend-ai-ingestion.md)，实时看板仍未开放。
+正式后端使用 PostgreSQL 保存手动反馈、幂等键和审计。启动、账号和课堂初始化分别见 [数据库说明](backend-database.md)、[账号说明](backend-auth.md)、[课堂说明](backend-classrooms.md)。应用健康接口 stage 为 `realtime-ai-control`；全量统计与 CSV 见 [统计导出](backend-statistics.md)，AI 接口见 [匿名 AI 入库](backend-ai-ingestion.md)，实时看板与代理见 [实时说明](backend-realtime-ai.md)。
 
 ## 提交
 
