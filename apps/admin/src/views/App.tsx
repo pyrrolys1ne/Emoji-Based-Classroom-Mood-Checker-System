@@ -33,11 +33,19 @@ import { summarize } from '../models/statistics';
 import { useAuth } from '../controllers/useAuth';
 import { LoginPage } from './LoginPage';
 import { AIPage } from './AIPage';
+import { TeachersPage } from './TeachersPage';
+import { AcademicPage } from './AcademicPage';
+import '../management.css';
+import { StudentProfileForm } from './components/StudentProfileForm';
+import { canManage, managementNotice } from '../repositories/managementRepository';
+import { editableStudent } from '../models/management';
 import { EmotionChart, Trend } from './components/Charts';
 
 const pages = [
   { id: 'dashboard', label: '课堂概览', icon: LayoutDashboard },
   { id: 'users', label: '用户管理', icon: Users },
+  { id: 'teachers', label: '教师审批', icon: Users },
+  { id: 'academic', label: '课程课堂', icon: CalendarDays },
   { id: 'records', label: '情绪记录', icon: MessageCircle },
   { id: 'sessions', label: '课堂安排', icon: CalendarDays },
   { id: 'statistics', label: '多维统计', icon: BarChart3 },
@@ -229,13 +237,17 @@ function Dashboard({
   );
 }
 
-function UsersPage({ data }: { data: WorkspaceData }) {
+function UsersPage({ data, changed }: { data: WorkspaceData; changed: () => Promise<void> }) {
+  const [editing, setEditing] = useState<User | null>(null);
+  const [message, setMessage] = useState('');
   const [query, setQuery] = useState('');
   const [role, setRole] = useState('');
   const users = data.users.filter(
     (user) =>
       (!role || user.role === role) &&
-      `${user.username} ${user.email}`.toLowerCase().includes(query.toLowerCase()),
+      `${user.username} ${user.email} ${user.realName ?? ''} ${user.studentNo ?? ''} ${user.className ?? ''}`
+        .toLowerCase()
+        .includes(query.toLowerCase()),
   );
   return (
     <Panel
@@ -245,7 +257,7 @@ function UsersPage({ data }: { data: WorkspaceData }) {
       <div className="filters">
         <input
           aria-label="搜索用户"
-          placeholder="搜索姓名或邮箱…"
+          placeholder="搜索姓名、学号、班级或邮箱…"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
@@ -262,6 +274,12 @@ function UsersPage({ data }: { data: WorkspaceData }) {
           ))}
         </select>
       </div>
+      {!canManage && <p className="management-note">{managementNotice}</p>}
+      {message && (
+        <p className="management-note success-message" role="status">
+          {message}
+        </p>
+      )}
       {users.length ? (
         <div className="table-wrap">
           <table>
@@ -271,6 +289,8 @@ function UsersPage({ data }: { data: WorkspaceData }) {
                 <th>邮箱</th>
                 <th>角色</th>
                 <th>状态</th>
+                <th>学生资料</th>
+                <th>操作</th>
               </tr>
             </thead>
             <tbody>
@@ -284,6 +304,34 @@ function UsersPage({ data }: { data: WorkspaceData }) {
                   <td>{roleNames[user.role]}</td>
                   <td>
                     <span className="tag">{user.status === 'ACTIVE' ? '正常' : '已停用'}</span>
+                    {user.teacherApprovalStatus && (
+                      <small>
+                        教师申请：
+                        {
+                          { PENDING: '待审批', APPROVED: '已批准', REJECTED: '已驳回' }[
+                            user.teacherApprovalStatus
+                          ]
+                        }
+                      </small>
+                    )}
+                  </td>
+                  <td>
+                    {user.realName || '—'}
+                    <small>
+                      {user.studentNo || '无学号'} · {user.className || '无所属班级'}
+                    </small>
+                  </td>
+                  <td>
+                    {editableStudent(user) && (
+                      <button
+                        className="text-button"
+                        disabled={!canManage}
+                        aria-label={`编辑学生 ${user.username}`}
+                        onClick={() => setEditing(user)}
+                      >
+                        编辑资料
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -292,6 +340,17 @@ function UsersPage({ data }: { data: WorkspaceData }) {
         </div>
       ) : (
         <Empty />
+      )}
+      {editing && (
+        <StudentProfileForm
+          user={editing}
+          close={() => setEditing(null)}
+          saved={async () => {
+            setEditing(null);
+            setMessage('学生资料已保存。');
+            await changed();
+          }}
+        />
       )}
     </Panel>
   );
@@ -448,7 +507,9 @@ function ScheduleDialog({
   const [selected, setSelected] = useState(session.scheduledUserIds);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const students = data.users.filter((user) => user.role === 'STUDENT');
+  const students = data.users.filter(
+    (user) => selected.includes(user.id) || (editableStudent(user) && user.status === 'ACTIVE'),
+  );
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     const dialog = document.querySelector<HTMLDialogElement>('dialog');
@@ -503,7 +564,10 @@ function ScheduleDialog({
               }
             />
             <span>{user.username}</span>
-            <small>{user.email}</small>
+            <small>
+              {user.email}
+              {!editableStudent(user) || user.status !== 'ACTIVE' ? ' · 不可安排，仅可移除' : ''}
+            </small>
           </label>
         ))}
       </div>
@@ -798,10 +862,11 @@ function Workspace({ user, logout }: { user: User; logout: () => Promise<void> }
     setMobileOpen(false);
   };
   const allowedPages = pages.filter(
-    (item) => user.role === 'ADMIN' || !['users', 'ai'].includes(item.id),
+    (item) => user.role === 'ADMIN' || !['users', 'ai', 'teachers', 'academic'].includes(item.id),
   );
   useEffect(() => {
-    if (user.role !== 'ADMIN' && (page === 'users' || page === 'ai')) go('dashboard');
+    if (user.role !== 'ADMIN' && ['users', 'ai', 'teachers', 'academic'].includes(page))
+      go('dashboard');
   }, [user.role, page]);
   const active = pages.find((item) => item.id === page)!;
   const records = data ? sessionRecords(data, sessionId) : [];
@@ -980,7 +1045,15 @@ function Workspace({ user, logout }: { user: User; logout: () => Promise<void> }
             data && (
               <div className="page-content" key={page}>
                 {page === 'dashboard' && <Dashboard data={data} records={records} go={go} />}
-                {page === 'users' && <UsersPage data={data} />}
+                {page === 'users' && user.role === 'ADMIN' && (
+                  <UsersPage data={data} changed={reload} />
+                )}
+                {page === 'teachers' && user.role === 'ADMIN' && (
+                  <TeachersPage users={data.users} changed={reload} />
+                )}
+                {page === 'academic' && user.role === 'ADMIN' && (
+                  <AcademicPage data={data} changed={reload} />
+                )}
                 {page === 'records' && (
                   <RecordsPage
                     data={data}
