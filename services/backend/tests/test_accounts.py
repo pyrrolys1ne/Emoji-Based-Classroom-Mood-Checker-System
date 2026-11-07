@@ -325,13 +325,13 @@ def test_audit_failure_rolls_back_account_and_does_not_leak_credentials(auth):
 
 def test_cli_initialization_and_repeated_failure_never_echo_password(auth):
     client, _, database = auth
-    env = {**os.environ, "PYTHONPATH": "services/backend", "MOOD_DATABASE_URL": database.url.render_as_string(hide_password=False)}
+    env = {**os.environ, "PYTHONPATH": "services/backend", "PYTHONIOENCODING": "utf-8", "MOOD_DATABASE_URL": database.url.render_as_string(hide_password=False)}
     command = [sys.executable, "-m", "app.cli.bootstrap_admin", "--username", "admin", "--email", "admin@example.edu", "--password-stdin"]
-    first = subprocess.run(command, input=PASSWORD + "\n", env=env, cwd=ROOT, capture_output=True, text=True, timeout=20)
+    first = subprocess.run(command, input=PASSWORD + "\n", env=env, cwd=ROOT, capture_output=True, text=True, encoding="utf-8", timeout=20)
     assert first.returncode == 0, first.stderr
     assert PASSWORD not in first.stdout + first.stderr
     assert login(client, "admin").status_code == 200
-    repeated = subprocess.run(command, input=PASSWORD + "\n", env=env, cwd=ROOT, capture_output=True, text=True, timeout=20)
+    repeated = subprocess.run(command, input=PASSWORD + "\n", env=env, cwd=ROOT, capture_output=True, text=True, encoding="utf-8", timeout=20)
     assert repeated.returncode == 1 and "已存在管理员" in repeated.stderr
     assert PASSWORD not in repeated.stdout + repeated.stderr
 

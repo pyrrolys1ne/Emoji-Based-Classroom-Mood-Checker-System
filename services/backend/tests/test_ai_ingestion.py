@@ -223,7 +223,7 @@ def test_manual_and_ai_request_keys_have_separate_namespaces(actors, classroom):
 def test_upgrade_backfills_only_existing_keyed_ai_records(database, tmp_path):
     directory = ROOT / "infra/database"
     for item in load_migrations(directory)[:5]:
-        (tmp_path / item.name).write_text(item.sql)
+        (tmp_path / item.name).write_text(item.sql, encoding="utf-8")
     migrate(database, tmp_path)
     with database.begin() as connection:
         teacher = connection.scalar(text("INSERT INTO app_user(username,password_hash,email,role) VALUES ('teacher','synthetic-hash','teacher@example.edu','TEACHER') RETURNING id"))

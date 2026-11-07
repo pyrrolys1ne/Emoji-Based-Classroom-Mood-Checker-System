@@ -384,15 +384,15 @@ def test_import_command_validates_files_and_does_not_echo_password(actors, tmp_p
     data = actors
     source = tmp_path / "classrooms.json"
     source.write_text(json.dumps(seed_body(), ensure_ascii=False), encoding="utf-8")
-    env = {**os.environ, "PYTHONPATH": "services/backend", "MOOD_DATABASE_URL": data["database"].url.render_as_string(hide_password=False)}
+    env = {**os.environ, "PYTHONPATH": "services/backend", "PYTHONIOENCODING": "utf-8", "MOOD_DATABASE_URL": data["database"].url.render_as_string(hide_password=False)}
     command = [sys.executable, "-m", "app.cli.import_classrooms", "--username", "admin", "--file", str(source), "--password-stdin"]
-    result = subprocess.run(command, input=PASSWORD + "\n", env=env, cwd=ROOT, text=True, capture_output=True, timeout=20)
+    result = subprocess.run(command, input=PASSWORD + "\n", env=env, cwd=ROOT, text=True, encoding="utf-8", capture_output=True, timeout=20)
     assert result.returncode == 0, result.stderr
     assert PASSWORD not in result.stdout + result.stderr
-    repeated = subprocess.run(command, input=PASSWORD + "\n", env=env, cwd=ROOT, text=True, capture_output=True, timeout=20)
+    repeated = subprocess.run(command, input=PASSWORD + "\n", env=env, cwd=ROOT, text=True, encoding="utf-8", capture_output=True, timeout=20)
     assert repeated.returncode == 1 and "IMPORT_ALREADY_EXISTS" in repeated.stderr
     source.write_text(json.dumps({"password": PASSWORD}), encoding="utf-8")
-    invalid = subprocess.run(command, input=PASSWORD + "\n", env=env, cwd=ROOT, text=True, capture_output=True, timeout=20)
+    invalid = subprocess.run(command, input=PASSWORD + "\n", env=env, cwd=ROOT, text=True, encoding="utf-8", capture_output=True, timeout=20)
     assert invalid.returncode == 1
     assert PASSWORD not in invalid.stdout + invalid.stderr
 

@@ -8,7 +8,7 @@ from app.db.migrate import load_migrations, migrate
 def test_upgrade_preserves_records_and_versions_roll_back(database, tmp_path):
     directory = Path(__file__).resolve().parents[3] / "infra/database"
     for item in load_migrations(directory)[:6]:
-        (tmp_path / item.name).write_text(item.sql)
+        (tmp_path / item.name).write_text(item.sql, encoding="utf-8")
     migrate(database, tmp_path)
     with database.begin() as connection:
         teacher = connection.scalar(text("INSERT INTO app_user(username,password_hash,email,role) VALUES ('teacher','synthetic-hash','teacher@example.edu','TEACHER') RETURNING id"))
