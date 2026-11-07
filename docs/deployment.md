@@ -1,5 +1,7 @@
 # 部署与恢复
 
+本文介绍 Docker Compose 部署、升级与恢复；无需 Docker 的 Windows 本机安装、配置和进程启停见 [本地部署](local-deployment.md)。
+
 正式运行使用 PostgreSQL、正式后端、独立 AI 服务，以及 API 模式构建的两个静态站点。`services/integration` 不参与部署。需要 Docker Engine 和支持 `service_completed_successfully`、`up --wait` 的 Compose v2。
 
 ## 配置与首次启动

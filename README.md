@@ -1,145 +1,165 @@
 # 表情符号课堂情绪检查器系统
 
-软件工程实践项目。学生通过 emoji 反馈课堂感受，教师查看课堂历史、实时看板与多维统计，管理员管理用户、安排课堂学生并导出数据；独立 AI 服务负责视频情绪分析。
+软件工程实践项目。学生通过表情符号反馈课堂感受，教师查看所授课堂的历史、实时看板与统计，管理员审批教师、管理课程课堂、安排学生并导出数据；独立 AI 服务支持摄像头表情分析及匿名结构化上报。
 
-管理端提供登录适配、教师视图、实时连接、日期时间统计、CSV 和 AI 控制页面；独立本地联调服务可验证“采样 → 过滤 → 上报 → SQLite 保存 → 看板更新”。AI 服务包含模型适配、采样、持久化重试与启停。正式后端的接口状态见 API 文档；本地 DeepFace 摄像头模式需要额外安装模型依赖。详见 [管理端与 AI 开发说明](docs/admin-ai.md)。
+系统由 React + TypeScript Web 端、FastAPI 正式后端、PostgreSQL 数据库和独立 Python AI 服务组成。账号认证、课堂授权、手动反馈、全量统计、CSV 导出、WebSocket 实时通知和 AI 控制均通过正式后端提供。
 
-启动联调：首次执行 `.venv` 创建命令，并安装 `services/integration/requirements.txt` 与 `services/ai/requirements.txt` 中的依赖；之后运行 `npm run dev:integration`，打开 <http://127.0.0.1:5175>。合成账号 `admin` 或 `teacher`，密码均为 `integration-only`，仅供开发联调。
+## 运行方式
 
-本机摄像头可使用 DeepSeek API 做有次数与时长上限的采样实验，无需本地模型权重；只需安装 `services/ai/requirements-camera.txt`，详见 [摄像头 API 实验](docs/camera-api.md)。
+| 方式           | 数据与用途                                          | 说明                                                    |
+| -------------- | --------------------------------------------------- | ------------------------------------------------------- |
+| 本地完整部署   | 正式后端、PostgreSQL、AI 服务、两个 API 模式 Web 端 | [Windows PowerShell 部署步骤](docs/local-deployment.md) |
+| Docker Compose | PostgreSQL、迁移、后端、AI、Nginx 静态站点及代理    | [容器部署、升级与恢复](docs/deployment.md)              |
+| 前端演示       | 浏览器本地演示数据，两个 Web 端数据不互通           | 用于页面体验，不依赖后端                                |
+| 独立联调       | 合成账号、SQLite、模拟输入及 AI 控制                | 只供开发，不作为正式部署                                |
 
-图片表情分析可调用 DeepSeek `deepseek-flash`，无需安装本地模型。支持公开人像样本下载、无人脸对照与管理员分析页面，配置和命令见 [图片 API 说明](docs/image-api.md)。样本结果仅供测试，不写入课堂统计。
+## 本地完整部署
+
+需要 Node.js 22.12 以上（建议 24）、Python 3.13 和 PostgreSQL 17。以下命令均在仓库根目录执行。首次部署按 [本地部署说明](docs/local-deployment.md) 完成 PostgreSQL 账号、数据库及环境配置，再运行迁移和服务。
+
+安装依赖：
+
+```powershell
+npm ci
+if (-not (Test-Path .venv/Scripts/python.exe)) { python -m venv .venv }
+.\.venv\Scripts\python.exe -m pip install -r services/backend/requirements-dev.txt
+.\.venv\Scripts\python.exe -m pip install -r services/ai/requirements.txt
+```
+
+配置文件及关键字段：
+
+| 文件                     | 配置                                                    |
+| ------------------------ | ------------------------------------------------------- |
+| `services/backend/.env`  | PostgreSQL 连接、浏览器来源、独立 AI 入库令牌及控制令牌 |
+| `services/ai/.env`       | 后端地址、对应的两组 AI 令牌、可选 DeepSeek 密钥        |
+| `apps/admin/.env.local`  | `VITE_DATA_MODE=api`、后端代理地址                      |
+| `apps/client/.env.local` | `VITE_DATA_MODE=api`、后端代理地址和管理端链接          |
+
+从对应 `.env.example` 创建配置，保留已有文件；密钥仅存服务端。后端 `MOOD_AI_SERVICE_TOKEN` 对应 AI 的 `AI_SERVICE_TOKEN`，后端 `MOOD_AI_CONTROL_TOKEN` 对应 AI 的 `AI_CONTROL_TOKEN`，两组令牌必须不同。正式数据保持 `MOOD_ALLOW_SIMULATED_AI=false`。
+
+数据库启动并完成配置后，首次迁移、创建管理员和构建：
+
+```powershell
+$env:PYTHONPATH = 'services/backend'
+.\.venv\Scripts\python.exe -m app.db.migrate
+.\.venv\Scripts\python.exe -m app.cli.bootstrap_admin --username admin --email admin@example.edu
+npm run build
+```
+
+管理员密码由终端隐藏读取并确认，没有内置默认密码。公开注册只能创建学生或教师申请；教师需审核批准后才能登录。已有管理员时跳过初始化命令，日常启动不重复创建账号或数据库。
+
+分别在四个终端启动，工作目录均为仓库根目录：
+
+```powershell
+# 终端 1：正式后端
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --app-dir services/backend --host 127.0.0.1 --port 8000 --no-access-log
+```
+
+```powershell
+# 终端 2：独立 AI 服务，启动后不自动采集
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --app-dir services/ai --host 127.0.0.1 --port 8001 --no-access-log
+```
+
+```powershell
+# 终端 3：管理端构建预览
+npm exec --workspace @mood/admin -- vite preview --host 127.0.0.1 --port 5173 --strictPort
+```
+
+```powershell
+# 终端 4：客户端构建预览
+npm exec --workspace @mood/client -- vite preview --host 127.0.0.1 --port 5174 --strictPort
+```
+
+| 入口                 | 地址                              |
+| -------------------- | --------------------------------- |
+| 管理端、教师完整看板 | <http://127.0.0.1:5173>           |
+| 学生端、教师基础页   | <http://127.0.0.1:5174>           |
+| 后端就绪检查         | <http://127.0.0.1:8000/api/ready> |
+| 后端接口文档         | <http://127.0.0.1:8000/docs>      |
+| AI 存活检查          | <http://127.0.0.1:8001/health>    |
+
+本地前端提供 `/api` 代理，管理端另代理 `/ws`。Vite preview 适用于本机实验，对外部署使用 Nginx。服务只绑定回环地址，不自动配置开机自启。停止前先关闭 AI 采集，再按 `Ctrl+C` 结束各终端进程；PostgreSQL 正常关闭后数据保留，重启电脑后需重新启动服务。数据库启停、数据目录、备份恢复和常见问题见 [本地部署说明](docs/local-deployment.md)。
+
+首次业务检查顺序：客户端注册学生和教师 → 管理端批准教师 → 创建课程课堂 → 安排学生 → 学生在课堂时段内提交表情 → 教师查询历史 → 管理员核对实时看板、统计和 CSV。界面应显示“API 模式”，完整步骤和独立验收命令见 [本地流程检查](docs/local-deployment.md#6-检查完整业务流程)。
+
+## Docker Compose 部署
+
+安装 Docker Engine 与 Compose v2 后，首次创建根目录 `.env`，更换数据库密码并配置两个不同的随机 AI 令牌，再执行：
+
+```powershell
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+# 编辑 .env 完成配置后启动。
+docker compose config --quiet
+docker compose up --build -d --wait
+docker compose exec backend python -m app.cli.bootstrap_admin --username admin --email admin@example.edu
+```
+
+Compose 使用 PostgreSQL 持久卷，先执行数据库迁移，再启动后端、AI 和两个 API 模式的 Nginx 站点。管理端和客户端仍使用 5173、5174 端口。镜像不包含真实模型依赖或摄像头映射。
+
+停止使用 `docker compose down`，保留数据库及 AI 队列卷；`down --volumes` 会删除数据。域名、TLS、来源范围、升级、备份与恢复见 [部署说明](docs/deployment.md)。不要同时启动占用相同端口的本地进程和容器。
+
+## AI 图片与摄像头
+
+- DeepSeek `deepseek-flash` 支持公开样本识图及有次数、时长上限的摄像头实验，无需安装本地模型权重。密钥存于服务端，配置见 [图片 API](docs/image-api.md)。
+- 摄像头另需安装 `services/ai/requirements-camera.txt`，由管理员明确启动；远程模式需单独允许发送采样帧。参数、设备和停止规则见 [摄像头实验](docs/camera-api.md)。
+- 本地 DeepFace 模式另需 `services/ai/requirements-model.txt` 及模型权重，兼容性须在目标环境验证，见 [管理端与 AI 说明](docs/admin-ai.md)。
+
+公开样本不写入课堂统计；真实采集默认匿名，不保存原始视频帧、人脸图像或特征。模型自评分未经校准，不代表准确率、心理状态或学习效果。“专注”“困惑”只作为手动反馈，不由表情模型推断。上报失败的匿名结构化结果保存在本地队列中，使用稳定幂等键重试。
+
+## 演示与独立联调
+
+仅体验前端页面时，不创建 `.env.local` 或将两端 `VITE_DATA_MODE` 设为 `demo`，分别运行 `npm run dev:admin`、`npm run dev:client`。演示模式有明确标识，数据不与正式后端互通；开发服务在配置变化后需重启。
+
+独立联调需要安装 `services/integration/requirements.txt` 和 `services/ai/requirements.txt`，运行 `npm run dev:integration`，访问 <http://127.0.0.1:5175>。合成账号 `admin`、`teacher` 的密码均为 `integration-only`，仅供隔离联调，不能用于正式后端登录。
 
 ## 项目结构
 
 ```text
-apps/
-  admin/                 管理端；React + TypeScript + Vite
-    src/views/           页面、布局、展示组件
-    src/controllers/     页面状态与业务交互
-    src/models/          统计、CSV 与领域规则
-    src/repositories/    演示数据与 API 访问
-  client/                学生端与教师基础页；React + TypeScript + Vite
-packages/contracts/      前端共享类型与 emoji 枚举
-services/
-  backend/               FastAPI 后端
-    app/api/             控制器与接口路由
-    app/services/        业务服务
-    app/repositories/    数据访问
-    app/schemas/         请求、响应契约
-    app/core/            配置、认证扩展点、统一错误处理
-    tests/               接口与安全边界检查
-  ai/                    独立 AI 服务及推理管线扩展点
-  integration/           管理端与 AI 本地参考服务，非正式后端
-scripts/                 联调进程管理与隔离系统验收
-infra/                   PostgreSQL 初始脚本与 Dockerfile
+apps/admin/              管理端、教师看板；MVC 职责划分
+apps/client/             学生端、教师基础页
+packages/contracts/      共享类型、情绪枚举及接口契约
+services/backend/        FastAPI 正式后端；Controller、Service、Repository 分层
+services/ai/             独立 AI 服务、采样、推理适配及持久化重试
+services/integration/    合成账号与 SQLite 参考联调服务
+scripts/                 联调与隔离系统验收
+infra/                   PostgreSQL 迁移、Dockerfile 及 Nginx 配置
 docs/                    架构、接口、部署与验收说明
-.github/workflows/       前后端构建与测试 CI
-AGENTS.md                开发规范与技术约束
+AGENTS.md                项目开发规范
 ```
-
-## 快速启动管理端
-
-需要 Node.js 22.12 以上（建议 24），Python 3.13。以下命令均从仓库根目录执行。
-
-```powershell
-npm ci
-npm run dev:admin
-```
-
-打开 <http://127.0.0.1:5173>。默认使用演示数据，不依赖数据库或后端。包含课堂概览、用户目录、情绪记录、课堂学生安排和多维统计页面；支持筛选、分页、CSV 导出和本地安排保存。刷新会重新生成当天演示数据，安排结果保存在浏览器本地存储。
-
-```powershell
-# 另开一个终端启动客户端
-npm run dev:client
-```
-
-客户端位于 <http://127.0.0.1:5174>，提供学生账号、课堂选择、表情反馈、持久演示历史、改密和退出，以及教师课堂历史与基础统计。默认演示模式有明确标识，可直接体验学生或教师；API 模式使用独立的真实接口适配，不会把接口失败显示为演示成功。两个演示端的数据不互通。配置、演示账号、架构和测试命令见 [客户端运行与维护](docs/client-development.md)，接口依赖见 [客户端对接约定](docs/client-integration.md)。正式后端账号、教师审批、课程课堂管理、学生安排、手动反馈、授权历史、全量统计和服务端 CSV 导出已实现。
-
-## 启动后端与 AI 服务
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r services/backend/requirements-dev.txt
-$env:PYTHONPATH = 'services/backend'
-.\.venv\Scripts\python.exe -m app.db.migrate
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --app-dir services/backend --reload --host 127.0.0.1 --port 8000
-```
-
-- 后端存活检查：<http://127.0.0.1:8000/api/health>。
-- 数据库就绪检查：<http://127.0.0.1:8000/api/ready>，数据库不可用时返回 503。
-- Swagger 文档：<http://127.0.0.1:8000/docs>。
-- OpenAPI：<http://127.0.0.1:8000/openapi.json>。
-
-本地配置参考 `services/backend/.env.example`，复制为同目录 `.env` 后修改；配置文件路径独立于启动时所在目录。后端已实现注册、登录、本人信息、改密、注销、管理员用户目录、教师审批、课程课堂管理、学生资料、安排名单、手动反馈、授权历史查询和匿名 AI 入库。密码使用 Argon2id 加盐哈希，会话、反馈和审计持久化至 PostgreSQL。未携带有效身份的受保护请求返回 401，无所需角色返回 403。基础与多维统计、CSV 导出已接入全量记录，实时票据、WebSocket 刷新通知、授权看板和管理员 AI 控制代理已接通。
-
-后端接口、配置与调用约束见 [后端接入说明](docs/backend-handoff.md)，权限、异常及持久性核对见 [后端联调验收清单](docs/backend-acceptance.md)。
-
-首个管理员通过受控命令初始化，终端隐藏读取并确认密码：
-
-```powershell
-.\.venv\Scripts\python.exe -m app.cli.bootstrap_admin --username admin --email admin@example.edu
-```
-
-公开注册不能创建管理员；教师申请审核批准后才能登录。已有管理员时初始化命令拒绝重复创建。多设备可同时登录，退出只撤销当前会话，改密撤销全部会话。命令、接口与权限说明见 [账号认证与教师审批](docs/backend-auth.md)。
-
-管理员可通过管理接口创建课程、指定课堂任课教师并安排学生，也可使用受控初始化命令整批导入：
-
-```powershell
-.\.venv\Scripts\python.exe -m app.cli.import_classrooms --username admin --file docs/examples/classrooms.json
-```
-
-示例仅使用合成账号引用，运行前需要已有学生及已审核教师，并调整时间和批次编号；密码由终端隐藏读取，整批失败回滚，重复批次明确拒绝。教师只查询所授课堂，学生只查询被安排课堂及本人名单信息。接口和文件格式见 [课程课堂与学生安排](docs/backend-classrooms.md)。
-
-学生在服务端课堂时段 `[startsAt,endsAt)` 内提交手动反馈；同一操作的重试复用 `Idempotency-Key`，主动再次反馈使用新键。学生查看本人手动历史，教师查看所授课堂历史；移出名单不删除既有反馈。接口示例、筛选和错误码见 [手动反馈与历史](docs/backend-feedback.md)。健康接口的 stage 为 `realtime-ai-control`。
-
-AI 服务单独启动：
-
-```powershell
-.\.venv\Scripts\python.exe -m pip install -r services/ai/requirements.txt
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --app-dir services/ai --reload --host 127.0.0.1 --port 8001
-```
-
-访问 <http://127.0.0.1:8001/health>。服务默认不采集；控制接口需要独立 `AI_CONTROL_TOKEN`，上报需要 `AI_SERVICE_TOKEN`。服务自动读取 `services/ai/.env`，已有进程环境变量优先，联调脚本自动注入临时令牌。真实模型依赖位于 `requirements-model.txt`，基础联调无需安装。“专注”“困惑”仅作为手动反馈，AI 映射七种基本表情。模型与摄像头的兼容性应在目标运行环境验证。
-
-正式后端已接入匿名 AI 结构化上报。配置 `AI_BACKEND_URL` 指向正式后端，并使 `AI_SERVICE_TOKEN` 与后端 `MOOD_AI_SERVICE_TOKEN` 一致；控制令牌单独配置。采样须发生在课堂时段内，支持课后补传，低分过滤与重复上报均返回明确回执。模拟输入仅用于隔离开发数据库，正式默认拒绝；运行配置和错误处理见 [匿名 AI 入库](docs/backend-ai-ingestion.md)。
-
-macOS / Linux 使用 `.venv/bin/python` 替换 `.venv\Scripts\python.exe`。
-
-统计默认只含手动反馈，可显式选择 AI 或全部来源；教师只统计所授课堂，CSV 仅管理员可下载。正式管理端的情绪分布、时间趋势和课程班级汇总来自同一服务端响应；表格分页不截断导出。接口和 CSV 格式见 [全量统计与 CSV 导出](docs/backend-statistics.md)。
-
-实时连接先以登录态换取 30 秒内有效的一次性票据，来源须精确匹配 `MOOD_CORS_ORIGINS`，退出后撤销对应访问。正式管理端默认 `/ws/dashboard`，开发代理已支持 WebSocket；部署代理需转发该路径的连接升级。AI 控制需要后端 `MOOD_AI_CONTROL_TOKEN` 与 AI 服务 `AI_CONTROL_TOKEN` 一致，真实采集仅由明确启动操作触发，远程模式需单独允许发送帧并限制采样次数和时长。协议、配置和未知结果处理见 [实时看板与 AI 控制](docs/backend-realtime-ai.md)。
-
-## 数据库与容器
-
-安装 Docker 后，可选择以下方式启动 PostgreSQL 与 Python 服务：
-
-```powershell
-Copy-Item .env.example .env
-docker compose up --build -d --wait
-```
-
-Compose 同时构建 API 模式的管理端和客户端，由 Nginx 在 5173、5174 端口提供静态文件及 `/api/`、`/ws/dashboard` 代理。`migrate` 服务在 PostgreSQL 就绪后按顺序执行 `infra/database/001` 至 `007`，成功后启动后端；已有数据卷使用同一迁移入口。AI 的内部地址和独立令牌与后端同步，匿名重试队列保存到 `mood_ai_data` 卷，重启不自动采集。镜像不包含真实模型依赖或摄像头映射。
-
-迁移记录版本和校验和，结构与升级见 [后端数据库说明](docs/backend-database.md)。不内置管理员账号；执行 `docker compose exec backend python -m app.cli.bootstrap_admin --username admin --email admin@example.edu` 受控创建。默认数据库密码仅供本地开发，启动前更换并配置两个不同的随机 AI 令牌。端口只绑定回环地址，域名、TLS、来源配置、升级与备份恢复见 [部署说明](docs/deployment.md)。普通停止保留数据卷，不要在需要保留数据的环境执行 `down --volumes`。
-
-## 管理端接入真实 API
-
-复制 `apps/admin/.env.example` 为同目录 `.env.local`，设置 `VITE_DATA_MODE=api`。开发服务器把 `/api` 请求代理到后端 8000 端口。重启 Vite 后生效。
-
-API 模式支持登录、会话恢复、课堂选择、手动反馈与个人历史，可连接正式后端使用真实账号。教师需先获管理员批准，课堂、名单和历史按角色返回真实数据；教师基础统计支持按手动、AI、全部来源切换；正式管理端使用服务端多维统计和 CSV 下载，WebSocket 通知变化后自动刷新，管理员可启停独立 AI 服务并查询公开样本状态。独立联调环境继续提供合成账号与隔离数据，用于验证管理端与 AI 的完整参考接口。默认纯演示模式没有真实账号认证。
 
 ## 验证
 
 ```powershell
 npm run typecheck
 npm run test:admin
+npm run test:client
 npm run build
-Push-Location services/backend
-..\..\.venv\Scripts\python.exe -m pytest -q
-Pop-Location
+.\.venv\Scripts\python.exe -m pytest services/backend/tests -q
+.\.venv\Scripts\python.exe -m pytest services/ai/tests -q
 ```
 
-设置具备创建数据库权限的 `MOOD_TEST_DATABASE_URL` 后，运行 `npm run test:system` 可验证两个生产构建、正式后端、真实 PostgreSQL 与独立 AI 的完整链路；使用独立临时库、随机令牌及明确标记的模拟输入，不使用参考联调替身。Docker 环境运行 `npm run test:system -- --runtime compose`，另验证 Nginx 代理、持久卷和备份恢复。
+后端真实 PostgreSQL 测试需要设置 `MOOD_TEST_DATABASE_URL`，测试账号须有创建数据库权限；未配置时相关测试会跳过，不能据此认定数据库验证通过。测试创建并清理独立临时库，不清空连接地址指向的数据库。
 
-CI 执行类型与构建、前后端业务测试、AI 与联调测试、客户端浏览器兼容检查，以及真实数据库和容器系统验收。运行前提、覆盖和未执行的真实模型、摄像头、远程推理及目标主机项目见 [系统验收](docs/system-acceptance.md)。
+安装验收浏览器后执行完整链路验证：
+
+```powershell
+npx playwright install chromium
+# 先设置指向独立测试环境的 MOOD_TEST_DATABASE_URL。
+npm run test:system
+```
+
+系统验收使用正式后端、真实 PostgreSQL、两个前端构建和独立 AI 服务；只使用合成账号、临时数据库及明确标记的模拟 AI，不自动采集或调用付费 API。Docker 环境运行 `npm run test:system -- --runtime compose`，另验证 Nginx、持久卷和备份恢复。验证范围见 [系统验收](docs/system-acceptance.md)。
+
+## 功能与接口文档
+
+| 内容               | 文档                                                                             |
+| ------------------ | -------------------------------------------------------------------------------- |
+| 管理操作入口       | [教师审批、课程课堂与学生资料](docs/admin-management.md)                         |
+| 数据库结构与迁移   | [后端数据库](docs/backend-database.md)                                           |
+| 账号与角色         | [认证与教师审批](docs/backend-auth.md)                                           |
+| 课程、课堂与名单   | [课堂管理](docs/backend-classrooms.md)                                           |
+| 手动反馈与授权历史 | [反馈与历史](docs/backend-feedback.md)                                           |
+| 统计与导出         | [全量统计与 CSV](docs/backend-statistics.md)                                     |
+| 实时连接与 AI 控制 | [实时看板与 AI 控制](docs/backend-realtime-ai.md)                                |
+| AI 上报与幂等      | [匿名 AI 入库](docs/backend-ai-ingestion.md)                                     |
+| 客户端配置与接口   | [运行与维护](docs/client-development.md)、[对接约定](docs/client-integration.md) |
