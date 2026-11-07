@@ -241,7 +241,7 @@ def browser(stack, fixtures, phase):
     result = subprocess.run(["node", "scripts/system-browser.mjs"], cwd=ROOT, env={
         **stack.env, "MOOD_ACCEPTANCE_FIXTURES": json.dumps(fixtures),
         "MOOD_ACCEPTANCE_URLS": json.dumps(stack.urls), "MOOD_ACCEPTANCE_PHASE": phase,
-    }, text=True, capture_output=True, timeout=180)
+    }, text=True, encoding="utf-8", capture_output=True, timeout=180)
     # 浏览器异常和追踪仅写本地忽略目录，不输出令牌或测试资料。
     (stack.directory / f"browser-{phase}.log").write_text(result.stdout + result.stderr, encoding="utf-8")
     require(result.returncode == 0, f"浏览器验收失败，请查看 .local/acceptance/browser-{phase}.log。")
