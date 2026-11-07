@@ -314,7 +314,7 @@ def backup_restore(stack):
                 values.append({table: connection.execute(text(f'SELECT * FROM "{table}" ORDER BY 1')).all()
                                for table in ("schema_migration", "app_user", "user_session", "ws_ticket",
                                              "teacher_application", "course", "class_session", "schedule_user",
-                                             "classroom_import", "emoji_record", "audit_log", "ai_ingestion")})
+                                             "classroom_import", "emoji_record", "audit_log", "ai_ingestion", "admin_invitation")})
         finally:
             engine.dispose()
     require(values[0] == values[1], "备份恢复后的账号、课堂、记录、会话、审计或幂等回执不一致。")

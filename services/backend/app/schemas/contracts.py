@@ -70,6 +70,19 @@ class AdminBootstrapRequest(Contract):
     real_name: Name | None = None
 
 
+class AdminRegistrationRequest(AdminBootstrapRequest):
+    invitation_code: str = Field(pattern=r"^adm_[A-Za-z0-9_-]{43}$", repr=False, json_schema_extra={"writeOnly": True})
+
+
+class AdminInvitationRequest(Contract):
+    expires_in_hours: int = Field(default=24, ge=1, le=168)
+
+
+class AdminInvitationResponse(Contract):
+    code: str = Field(repr=False)
+    expires_at: AwareDatetime
+
+
 class EmojiSubmission(Contract):
     session_id: UUID
     emotion: Emotion

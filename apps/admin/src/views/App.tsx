@@ -40,6 +40,7 @@ import { StudentProfileForm } from './components/StudentProfileForm';
 import { canManage, managementNotice } from '../repositories/managementRepository';
 import { editableStudent } from '../models/management';
 import { EmotionChart, Trend } from './components/Charts';
+import { AdminInvitationPanel } from './components/AdminInvitationPanel';
 
 const pages = [
   { id: 'dashboard', label: '课堂概览', icon: LayoutDashboard },
@@ -275,6 +276,7 @@ function UsersPage({ data, changed }: { data: WorkspaceData; changed: () => Prom
         </select>
       </div>
       {!canManage && <p className="management-note">{managementNotice}</p>}
+      <AdminInvitationPanel />
       {message && (
         <p className="management-note success-message" role="status">
           {message}

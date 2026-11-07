@@ -49,6 +49,29 @@ try {
     await expect(target.getByRole('button', { name: '退出', exact: true })).toBeVisible();
     console.log('通过：重启后生产构建页面重新登录、个人历史与刷新恢复。');
   } else {
+    const invitedAdmin = await page();
+    const invitation = await value(
+      invitedAdmin,
+      'POST',
+      '/admin/invitations',
+      fixtures.admin.token,
+      { expiresInHours: 1 },
+    );
+    await invitedAdmin.goto(urls.admin);
+    await invitedAdmin.getByRole('button', { name: '管理员注册', exact: true }).click();
+    await invitedAdmin.getByLabel('用户名', { exact: true }).fill('browser-admin');
+    await invitedAdmin.getByLabel('邮箱', { exact: true }).fill('browser-admin@example.edu');
+    await invitedAdmin.getByLabel('密码', { exact: true }).fill(password);
+    await invitedAdmin.getByLabel('确认密码', { exact: true }).fill(password);
+    await invitedAdmin.getByLabel('邀请码', { exact: true }).fill(invitation.code);
+    await invitedAdmin.getByRole('button', { name: '注册管理员', exact: true }).click();
+    await expect(invitedAdmin.getByText('管理员注册成功，请登录。', { exact: true })).toBeVisible();
+    await login(invitedAdmin, 'browser-admin', true);
+    await invitedAdmin.getByRole('button', { name: '用户管理', exact: true }).click();
+    await invitedAdmin.getByRole('button', { name: '生成管理员邀请码', exact: true }).click();
+    await expect(invitedAdmin.getByLabel('一次性邀请码', { exact: true })).toBeVisible();
+    await invitedAdmin.getByRole('button', { name: '退出登录', exact: true }).click();
+    console.log('通过：管理员一次性邀请注册、真实登录与管理员生成邀请码。');
     const student = await page();
     const registered = await page();
     await registered.goto(urls.client);

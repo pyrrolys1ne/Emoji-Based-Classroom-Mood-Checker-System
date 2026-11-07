@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Response
 
 from app.core.security import require_admin, require_user
 from app.schemas.contracts import (
+    AdminInvitationRequest, AdminInvitationResponse, AdminRegistrationRequest,
     AuthSession, Envelope, LoginRequest, PasswordRequest, RegisterRequest,
     TeacherApplication, TeacherReviewRequest, User,
 )
@@ -30,6 +31,17 @@ def register(body: RegisterRequest):
 @router.post("/auth/login", tags=["认证"], response_model=Envelope[AuthSession])
 def login(body: LoginRequest):
     return Envelope(data=accounts.login(body))
+
+
+@router.post("/auth/admin-register", tags=["认证"], response_model=Envelope[None])
+def register_admin(body: AdminRegistrationRequest):
+    accounts.register_admin(body)
+    return Envelope(data=None)
+
+
+@router.post("/admin/invitations", tags=["管理员注册"], response_model=Envelope[AdminInvitationResponse])
+def invite_admin(body: AdminInvitationRequest, principal: Administrator):
+    return Envelope(data=accounts.issue_admin_invitation(body, principal))
 
 
 @router.post("/auth/logout", tags=["认证"], response_model=Envelope[None])

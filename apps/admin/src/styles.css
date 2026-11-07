@@ -1056,3 +1056,20 @@ dialog::backdrop {
     transition: none !important;
   }
 }
+.admin-invitation {
+  margin: 16px 0;
+  padding: 16px;
+  border: 1px solid #dce8e1;
+  border-radius: 12px;
+  background: #f6faf7;
+}
+.admin-invitation h3 {
+  margin: 0 0 8px;
+}
+.admin-invitation p {
+  margin: 8px 0;
+}
+.admin-invitation input {
+  width: 100%;
+  max-width: 600px;
+}

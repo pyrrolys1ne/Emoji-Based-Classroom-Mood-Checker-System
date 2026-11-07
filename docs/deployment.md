@@ -13,10 +13,10 @@ cp .env.example .env
 # 编辑 .env：更换数据库密码，分别设置两个不同的随机 AI 令牌。
 docker compose config --quiet
 docker compose up --build -d --wait
-docker compose exec backend python -m app.cli.bootstrap_admin --username admin --email admin@example.edu
+docker compose exec backend python -m app.cli.create_admin_invite --expires-in-hours 24
 ```
 
-管理员密码由终端隐藏读取，不写入命令参数或版本库。公开注册只能创建学生或教师申请，审批、课程和课堂安排见 [账号认证](backend-auth.md) 与 [课堂管理](backend-classrooms.md)。不内置真实账号或课堂。
+命令生成一次性管理员邀请码，在管理端登录页通过“管理员注册”创建账号并登录。已有管理员可在“用户管理”生成新邀请码；普通注册只能创建学生或教师申请，审批、课程和课堂安排见 [账号认证](backend-auth.md) 与 [课堂管理](backend-classrooms.md)。不内置真实账号或课堂。
 
 默认入口为管理端 `http://127.0.0.1:5173`、客户端 `http://127.0.0.1:5174`。两个 Nginx 站点提供生产静态文件，将 `/api/` 转发至正式后端，将 `/ws/dashboard` 转发并升级为 WebSocket。健康检查分别覆盖数据库、后端数据库连通性、AI 存活与静态首页；`/api/ready` 不证明迁移完整或模型已加载，迁移另由前置服务和验收保证。
 
@@ -26,13 +26,13 @@ docker compose exec backend python -m app.cli.bootstrap_admin --username admin -
 | `MOOD_AI_SERVICE_TOKEN`                             | 后端入库认证，同步注入 AI 的 `AI_SERVICE_TOKEN`                                    |
 | `MOOD_AI_CONTROL_TOKEN`                             | 后端控制代理认证，同步注入 AI 的 `AI_CONTROL_TOKEN`；与入库令牌不同                |
 | `MOOD_CORS_ORIGINS`                                 | JSON 数组，精确列出浏览器实际访问的来源，包含协议和端口；同时校验 WebSocket Origin |
-| `MOOD_ADMIN_PUBLIC_URL`                             | 客户端“管理端”链接的构建地址；更改后重建 client 镜像                               |
+| `MOOD_ADMIN_PUBLIC_URL`                             | 留空时使用客户端当前主机的 5173 端口；设置显式入口后重建 client 镜像               |
 | `MOOD_*_PORT`                                       | PostgreSQL、后端、AI、管理端、客户端的本地映射端口，见根 `.env.example`            |
 | `MOOD_REALTIME_POLL_SECONDS`                        | 服务端重新检查实时身份和版本的间隔，默认 1 秒                                      |
 | `MOOD_ALLOW_SIMULATED_AI`                           | 正式数据保持 `false`；系统验收仅在独立临时库中打开                                 |
 | `DEEPSEEK_API_KEY`                                  | 可选，仅传入 AI 服务；空值不调用远程模型                                           |
 
-Compose 内部固定使用 `http://backend:8000` 上报、`http://ai:8001` 控制，避免把宿主机回环地址当作服务地址。所有宿主机端口默认只绑定回环地址。对外提供服务时，在目标环境配置域名、TLS 和入口代理，将两个站点分别转发，并保持 Origin 原值、WebSocket 升级头及足够的读取超时；同步修改来源列表和客户端管理端链接后重新构建。HTTPS 页面使用 `wss`。不能将开发数据库和 AI 内部控制端口直接暴露到公网。
+Compose 内部固定使用 `http://backend:8000` 上报、`http://ai:8001` 控制，避免把宿主机回环地址当作服务地址。所有宿主机端口默认只绑定回环地址。同一局域网通过 IP 使用时，仅在独立 Compose 覆盖配置中调整 admin、client 的宿主机端口绑定，并同步加入实际 IP 的两个 Web 来源；`MOOD_ADMIN_PUBLIC_URL` 留空即可沿用访问主机。无需购买域名，不能将数据库和 AI 内部控制端口直接暴露到网络。跨不可信网络发布时配置 TLS 与入口代理，保持 Origin 原值、WebSocket 升级头及足够的读取超时；HTTPS 页面使用 `wss`。
 
 ## AI 数据与设备
 

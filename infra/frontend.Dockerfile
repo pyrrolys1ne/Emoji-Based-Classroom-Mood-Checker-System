@@ -8,7 +8,7 @@ RUN npm ci
 COPY apps ./apps
 COPY packages ./packages
 ARG APP=admin
-ARG ADMIN_PUBLIC_URL=http://127.0.0.1:5173
+ARG ADMIN_PUBLIC_URL=
 RUN VITE_DATA_MODE=api VITE_API_BASE_URL=/api VITE_WS_URL= VITE_ADMIN_URL=${ADMIN_PUBLIC_URL} npm run build --workspace @mood/${APP}
 RUN cp -r apps/${APP}/dist /site
 

@@ -106,7 +106,7 @@ services:
       dockerfile: infra/frontend.Dockerfile
       args:
         APP: client
-        ADMIN_PUBLIC_URL: ${MOOD_ADMIN_PUBLIC_URL:-http://127.0.0.1:5173}
+        ADMIN_PUBLIC_URL: ${MOOD_ADMIN_PUBLIC_URL:-}
     ports:
       - '127.0.0.1:${MOOD_CLIENT_PORT:-5174}:80'
     healthcheck:

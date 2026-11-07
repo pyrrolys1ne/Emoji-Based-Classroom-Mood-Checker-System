@@ -15,7 +15,8 @@ from app.db.models import AppUser, TeacherApplication, UserSession
 from app.db.session import transaction
 from app.repositories.accounts import AccountsRepository
 from app.schemas.contracts import (
-    AdminBootstrapRequest, AuthSession, LoginRequest, PasswordRequest,
+    AdminBootstrapRequest, AdminInvitationRequest, AdminInvitationResponse, AdminRegistrationRequest,
+    AuthSession, LoginRequest, PasswordRequest,
     RegisterRequest, TeacherApplication as ApplicationResponse, TeacherReviewRequest, User,
 )
 
@@ -120,6 +121,37 @@ def login(body: LoginRequest) -> AuthSession:
         repo.audit("AUTH_LOGIN", user.id, user.id)
         result = AuthSession(token=token, user=user_response(user, approval))
     return result
+
+
+def issue_admin_invitation(body: AdminInvitationRequest, principal: Principal | None = None) -> AdminInvitationResponse:
+    code = "adm_" + token_urlsafe(32)
+    with transaction() as session:
+        repo = AccountsRepository(session)
+        actor = authorize_actor(repo, principal, admin=True) if principal is not None else None
+        now = datetime.now(timezone.utc)
+        invitation = repo.add_invitation(token_hash=token_digest(code), created_at=now,
+            expires_at=now + timedelta(hours=body.expires_in_hours), created_by=actor.id if actor else None)
+        repo.audit("ADMIN_INVITATION_CREATE", actor.id if actor else None, invitation.id)
+        result = AdminInvitationResponse(code=code, expires_at=invitation.expires_at)
+    return result
+
+
+def register_admin(body: AdminRegistrationRequest) -> None:
+    try:
+        with transaction() as session:
+            repo = AccountsRepository(session)
+            invitation = repo.invitation(token_digest(body.invitation_code))
+            now = datetime.now(timezone.utc)
+            if invitation is None or invitation.used_at is not None or invitation.expires_at <= now:
+                raise ApiError(403, "INVALID_ADMIN_INVITATION", "邀请码无效、已使用或已过期，请联系管理员。")
+            user = repo.add_user(username=body.username, email=str(body.email), password_hash=hash_password(body.password),
+                role=Role.ADMIN, status=UserStatus.ACTIVE, real_name=body.real_name)
+            invitation.used_at = now
+            invitation.used_by = user.id
+            repo.audit("ADMIN_REGISTER", user.id, user.id)
+            repo.audit("ADMIN_INVITATION_USE", user.id, invitation.id)
+    except IntegrityError as error:
+        account_conflict(error)
 
 
 def verify_account_login(repo: AccountsRepository, user: AppUser | None, password: str) -> tuple[AppUser, str | None]:

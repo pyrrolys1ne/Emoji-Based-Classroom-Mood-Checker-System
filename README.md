@@ -42,11 +42,11 @@ if (-not (Test-Path .venv/Scripts/python.exe)) { python -m venv .venv }
 ```powershell
 $env:PYTHONPATH = 'services/backend'
 .\.venv\Scripts\python.exe -m app.db.migrate
-.\.venv\Scripts\python.exe -m app.cli.bootstrap_admin --username admin --email admin@example.edu
+.\.venv\Scripts\python.exe -m app.cli.create_admin_invite --expires-in-hours 24
 npm run build
 ```
 
-管理员密码由终端隐藏读取并确认，没有内置默认密码。公开注册只能创建学生或教师申请；教师需审核批准后才能登录。已有管理员时跳过初始化命令，日常启动不重复创建账号或数据库。
+命令生成一次性管理员邀请码。启动管理端后，在登录页选择“管理员注册”，填写用户名、邮箱、密码及邀请码；成功后回到登录页。已有管理员可在“用户管理 → 邀请管理员”生成新邀请码，有效期 1—168 小时，使用后失效。普通学生／教师注册不能自行选择管理员角色；教师需审核批准后才能登录。无默认管理员密码，日常启动不重复注册账号或生成邀请码。命令行直接初始化首个管理员的方式仍保留，见 [账号认证](docs/backend-auth.md)。
 
 分别在四个终端启动，工作目录均为仓库根目录：
 
@@ -80,6 +80,8 @@ npm exec --workspace @mood/client -- vite preview --host 127.0.0.1 --port 5174 -
 
 本地前端提供 `/api` 代理，管理端另代理 `/ws`。Vite preview 适用于本机实验，对外部署使用 Nginx。服务只绑定回环地址，不自动配置开机自启。停止前先关闭 AI 采集，再按 `Ctrl+C` 结束各终端进程；PostgreSQL 正常关闭后数据保留，重启电脑后需重新启动服务。数据库启停、数据目录、备份恢复和常见问题见 [本地部署说明](docs/local-deployment.md)。
 
+客户端使用浏览器，无需安装 Android 应用或购买域名。同一局域网可通过 `http://<本机局域网IP>:5173`、`http://<本机局域网IP>:5174` 访问；按 [局域网 IP 配置](docs/local-deployment.md#局域网-ip-访问) 调整 Web 监听、来源和防火墙。数据库、后端及 AI 内部端口仍只在本机访问。
+
 首次业务检查顺序：客户端注册学生和教师 → 管理端批准教师 → 创建课程课堂 → 安排学生 → 学生在课堂时段内提交表情 → 教师查询历史 → 管理员核对实时看板、统计和 CSV。界面应显示“API 模式”，完整步骤和独立验收命令见 [本地流程检查](docs/local-deployment.md#6-检查完整业务流程)。
 
 ## Docker Compose 部署
@@ -91,12 +93,12 @@ if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 # 编辑 .env 完成配置后启动。
 docker compose config --quiet
 docker compose up --build -d --wait
-docker compose exec backend python -m app.cli.bootstrap_admin --username admin --email admin@example.edu
+docker compose exec backend python -m app.cli.create_admin_invite --expires-in-hours 24
 ```
 
 Compose 使用 PostgreSQL 持久卷，先执行数据库迁移，再启动后端、AI 和两个 API 模式的 Nginx 站点。管理端和客户端仍使用 5173、5174 端口。镜像不包含真实模型依赖或摄像头映射。
 
-停止使用 `docker compose down`，保留数据库及 AI 队列卷；`down --volumes` 会删除数据。域名、TLS、来源范围、升级、备份与恢复见 [部署说明](docs/deployment.md)。不要同时启动占用相同端口的本地进程和容器。
+凭生成的邀请码在管理端注册后登录。停止使用 `docker compose down`，保留数据库及 AI 队列卷；`down --volumes` 会删除数据。IP 入口、来源范围、升级、备份与恢复见 [部署说明](docs/deployment.md)。不要同时启动占用相同端口的本地进程和容器。
 
 ## AI 图片与摄像头
 

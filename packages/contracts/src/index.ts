@@ -42,6 +42,20 @@ export interface StudentProfileRequest {
   realName?: string | null;
   className?: string | null;
 }
+export interface AdminRegistrationRequest {
+  username: string;
+  email: string;
+  password: string;
+  invitationCode: string;
+  realName?: string | null;
+}
+export interface AdminInvitationRequest {
+  expiresInHours: number;
+}
+export interface AdminInvitationResponse {
+  code: string;
+  expiresAt: string;
+}
 export interface TeacherReviewRequest {
   decision: 'APPROVED' | 'REJECTED';
   reason?: string | null;

@@ -4,7 +4,24 @@
 
 ## 运行与管理员初始化
 
-先安装 `services/backend/requirements-dev.txt`，配置 `services/backend/.env` 并执行数据库迁移。账号功能沿用 `001` 至 `004` 结构，课堂管理新增 `005`，均通过迁移升级，无需重建数据库。
+先安装 `services/backend/requirements-dev.txt`，配置 `services/backend/.env` 并执行全部数据库迁移。管理员邀请注册新增 `008_admin_invitations.sql`，通过迁移升级，无需重建数据库。
+
+## 管理员邀请注册
+
+管理端登录页提供“管理员注册”，填写 `username,email,password,invitationCode`，可选 `realName`。成功后返回登录页，不自动发放登录会话。`POST /api/auth/admin-register` 固定创建新的 ADMIN 账号，不接收 role 或 status；普通 `POST /api/auth/register` 仍只允许学生及教师申请。
+
+已有管理员通过“用户管理 → 邀请管理员”调用 `POST /api/admin/invitations`，提交 `{expiresInHours:24}`，有效期限制为 1—168 小时，返回 `{code,expiresAt}`。教师、学生及未登录身份不能生成邀请码。首个账号可由部署操作者从仓库根目录生成邀请码：
+
+```powershell
+$env:PYTHONPATH = 'services/backend'
+.\.venv\Scripts\python.exe -m app.cli.create_admin_invite --expires-in-hours 24
+```
+
+容器命令为 `docker compose exec backend python -m app.cli.create_admin_invite --expires-in-hours 24`。邀请码使用 `adm_` 前缀及 32 字节随机值，数据库只存 SHA-256 摘要。生成接口禁止缓存，邀请码不进入 URL、前端持久存储或审计内容。注册时锁定邀请码行，在同一事务内创建账号、消费邀请码和写入审计；并发仅一次成功。已使用、过期或不存在返回 403 `INVALID_ADMIN_INVITATION`，重复用户名或邮箱返回 409 `ACCOUNT_EXISTS` 且保留邀请码，不能提升既有账号。有效期采用终点不包含规则。
+
+## 命令行初始化首个管理员
+
+部署操作者也可使用下列命令直接初始化首个管理员；这与邀请注册是两种可选的首次创建方式。
 
 从仓库根目录执行：
 
@@ -36,6 +53,8 @@ docker compose exec backend python -m app.cli.bootstrap_admin --username admin -
 | 接口                                                   | 身份与行为                                                                      |
 | ------------------------------------------------------ | ------------------------------------------------------------------------------- |
 | `POST /api/auth/register`                              | 公开注册 STUDENT，或以 TEACHER 提交教师申请；不能指定 ADMIN、账号状态或密码哈希 |
+| `POST /api/auth/admin-register`                        | 持有效一次性邀请码注册新管理员；成功返回 null，不自动登录                       |
+| `POST /api/admin/invitations`                          | 仅管理员；创建有时效的一次性管理员邀请码                                        |
 | `POST /api/auth/login`                                 | 校验账号密码、启用状态与教师审批；成功返回 `{token,user}`                       |
 | `GET /api/users/me`                                    | 返回当前用户资料，不包含密码哈希或会话摘要                                      |
 | `PUT /api/auth/password`                               | `{oldPassword,newPassword}`；原密码正确且新旧不同，成功后撤销全部会话及关联票据 |

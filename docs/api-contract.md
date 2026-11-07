@@ -1,6 +1,8 @@
 # API 契约
 
-当前契约为 v0.12。正式后端已实现账号、课堂、手动反馈、匿名 AI 入库、历史、统计、CSV、实时授权和管理员 AI 控制；本页统一描述当前状态，具体请求模型与响应以共享类型、后端 Pydantic 和 `/openapi.json` 为准。模型、设备与部署验证见 [系统验收](system-acceptance.md)。
+当前契约为 v0.13。正式后端已实现账号、课堂、手动反馈、匿名 AI 入库、历史、统计、CSV、实时授权和管理员 AI 控制；本页统一描述当前状态，具体请求模型与响应以共享类型、后端 Pydantic 和 `/openapi.json` 为准。模型、设备与部署验证见 [系统验收](system-acceptance.md)。
+
+管理员邀请注册：`POST /api/admin/invitations` 仅管理员调用，接收 `{expiresInHours}`（1—168，默认 24），返回 `{code,expiresAt}`；`POST /api/auth/admin-register` 接收 `{username,email,password,invitationCode,realName?}`，返回 null。邀请码仅存摘要、到期或已消费拒绝、账号创建与消费及审计同事务；普通注册不授予 ADMIN。详见 [管理员注册](backend-auth.md#管理员邀请注册)。
 
 ## 通用规则
 

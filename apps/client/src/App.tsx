@@ -5,23 +5,14 @@ import { createApiRepository, createDemoRepository } from './repositories';
 import { AccountView, AppShell, AuthView, HistoryView, StudentView, TeacherView } from './views';
 import { useClientAuth } from './viewmodels/useClientAuth';
 import { useClassroom } from './viewmodels/useClassroom';
+import { managementUrl } from './models/managementUrl';
 
 interface AppProps {
   repository?: ClientRepository;
   storage?: Storage;
 }
 function safeAdminUrl(): string {
-  try {
-    const url = new URL(
-      import.meta.env.VITE_ADMIN_URL ?? 'http://127.0.0.1:5173',
-      window.location.href,
-    );
-    return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password
-      ? url.href
-      : '';
-  } catch {
-    return '';
-  }
+  return managementUrl(window.location.href, import.meta.env.VITE_ADMIN_URL);
 }
 function Workspace({
   repository,

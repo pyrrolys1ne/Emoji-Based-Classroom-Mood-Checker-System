@@ -5,7 +5,7 @@ from sqlalchemy import exists, select, text, update
 from sqlalchemy.orm import Session
 
 from app.core.domain import Role
-from app.db.models import AppUser, AuditLog, TeacherApplication, UserSession, WsTicket
+from app.db.models import AdminInvitation, AppUser, AuditLog, TeacherApplication, UserSession, WsTicket
 
 
 class AccountsRepository:
@@ -97,7 +97,16 @@ class AccountsRepository:
             update(UserSession).where(*scope, UserSession.revoked_at.is_(None)).values(revoked_at=now)
         )
 
-    def audit(self, action: str, actor_id: UUID, target_id: UUID) -> None:
+    def add_invitation(self, **values) -> AdminInvitation:
+        invitation = AdminInvitation(**values)
+        self.session.add(invitation)
+        self.session.flush()
+        return invitation
+
+    def invitation(self, token_hash: str) -> AdminInvitation | None:
+        return self.session.scalar(select(AdminInvitation).where(AdminInvitation.token_hash == token_hash).with_for_update())
+
+    def audit(self, action: str, actor_id: UUID | None, target_id: UUID) -> None:
         self.session.add(AuditLog(action=action, actor_id=actor_id, target_id=target_id))
 
     def lock_bootstrap(self) -> None:

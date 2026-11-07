@@ -4,7 +4,7 @@
 
 ```mermaid
 flowchart TD
-  A[学生客户端 React 可替换为 Android] -->|REST JSON| API[后端 Controller]
+  A[学生浏览器客户端 React] -->|REST JSON| API[后端 Controller]
   B[管理端 View] --> C[管理端 Controller Hook]
   C --> M[管理端 Model 统计与规则]
   C --> R[管理端 Repository]

@@ -142,6 +142,21 @@ class TeacherApplication(Identity, Base):
     reason: Mapped[str | None] = mapped_column(String(500))
 
 
+class AdminInvitation(Identity, Base):
+    __tablename__ = "admin_invitation"
+    __table_args__ = (
+        CheckConstraint("token_hash ~ '^[0-9a-f]{64}$'", name="admin_invitation_hash_check"),
+        CheckConstraint("expires_at > created_at", name="admin_invitation_time_order"),
+        CheckConstraint("(used_at IS NULL AND used_by IS NULL) OR (used_at IS NOT NULL AND used_by IS NOT NULL AND used_at >= created_at AND used_at < expires_at)", name="admin_invitation_usage_check"),
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_by: Mapped[UUID | None] = mapped_column(ForeignKey("app_user.id"))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    used_by: Mapped[UUID | None] = mapped_column(ForeignKey("app_user.id"))
+
+
 class UserSession(Identity, Base):
     __tablename__ = "user_session"
     __table_args__ = (
