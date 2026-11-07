@@ -2,7 +2,7 @@
 
 正式后端位于 `services/backend`，使用 FastAPI、SQLAlchemy 和 PostgreSQL，按 Controller、Service、Repository 分层。已实现账号认证、教师审批、课程课堂、学生资料与安排、手动反馈、授权历史、匿名 AI 入库、全量统计、CSV、实时授权及管理员 AI 控制代理。
 
-当前接口契约为 v0.12，数据库迁移为 001—007。本文提供后端交付物与接入要求，逐项验证见 [后端联调验收清单](backend-acceptance.md)。`services/integration` 使用合成账号与 SQLite，只用于独立开发联调，不作为正式后端或正式账号来源。
+当前接口契约为 v0.13，数据库迁移为 001—008。本文提供后端交付物与接入要求，逐项验证见 [后端联调验收清单](backend-acceptance.md)。`services/integration` 使用合成账号与 SQLite，只用于独立开发联调，不作为正式后端或正式账号来源。
 
 ## 交付物索引
 
@@ -33,7 +33,7 @@
 | CSV 与 AI 控制代理                               | 禁止               | 禁止             | 允许         | 禁止           |
 | 结构化 AI 入库                                   | 禁止               | 禁止             | 禁止         | 仅独立入库令牌 |
 
-公开注册只接受 STUDENT 或 TEACHER；教师申请获批后才能登录。管理员由受控 CLI 初始化，不提供公开提权接口。课程默认教师变化不转移已有课堂权限；名单移除不删除既有历史，学生仍可查询本人已提交的记录。AI 记录不归属个人，userId 和 student 为 null。
+公开注册只接受 STUDENT 或 TEACHER；教师申请获批后才能登录。管理员通过一次性邀请注册创建，部署操作者也可用受控 CLI 初始化首个账号；普通公开注册不能直接授予管理员。课程默认教师变化不转移已有课堂权限；名单移除不删除既有历史，学生仍可查询本人已提交的记录。AI 记录不归属个人，userId 和 student 为 null。
 
 ## 本地接入前提
 
@@ -82,15 +82,8 @@ AI 上报还需将 `AI_BACKEND_URL` 指向正式后端。`DEEPSEEK_API_KEY` 只�
 
 ## 验证证据与结论边界
 
-已验证代码基线为 [d17d114](https://github.com/pyrrolys1ne/Emoji-Based-Classroom-Mood-Checker-System/commit/d17d1145643ba3238476cb0dbf084f1d7359fdc2)。[后端及系统 CI](https://github.com/pyrrolys1ne/Emoji-Based-Classroom-Mood-Checker-System/actions/runs/42174360102) 与 [客户端 CI](https://github.com/pyrrolys1ne/Emoji-Based-Classroom-Mood-Checker-System/actions/runs/42174360115) 均通过：
+当前本地验证结果、用例数量和限制见 [项目验证报告](project-verification.md)，接收环境的复现与视频录制见 [交接说明](handover.md)。管理员邀请注册、数据库迁移 008、浏览器 IP 入口与 SQL 注入专项已纳入验证范围。
 
-| 检查            | 已验证结果                                                                         |
-| --------------- | ---------------------------------------------------------------------------------- |
-| 正式后端 pytest | 246 项通过，包含真实 PostgreSQL、HTTP、跨进程及重启验证                            |
-| 相关模块回归    | AI 67 项、独立联调 7 项、管理端 36 项、客户端 65 项通过                            |
-| 客户端浏览器    | 20 项通过，包含 Chromium、Firefox、手机视口及受控 HTTP                             |
-| 类型与构建      | 共享契约和两个前端的类型检查、生产构建通过                                         |
-| 正式链路        | 两个 API 模式生产构建、正式后端、真实 PostgreSQL 与独立 AI 服务的隔离模拟链路通过  |
-| 容器链路        | CI 中的 Nginx HTTP / WebSocket 代理、AI 持久队列、服务重启及数据库备份恢复核对通过 |
+历史基线 [d17d114](https://github.com/pyrrolys1ne/Emoji-Based-Classroom-Mood-Checker-System/commit/d17d1145643ba3238476cb0dbf084f1d7359fdc2) 对应的 [后端及系统 CI](https://github.com/pyrrolys1ne/Emoji-Based-Classroom-Mood-Checker-System/actions/runs/42174360102) 和 [客户端 CI](https://github.com/pyrrolys1ne/Emoji-Based-Classroom-Mood-Checker-System/actions/runs/42174360115) 链接保留供复核，不表示当前 main 的远端 CI 状态。
 
-上述自动化证明后端业务、权限和结构化接口链路，不证明 DeepFace 效果、真实摄像头、DeepSeek 实际调用、目标主机 HTTPS / WSS 或真实移动设备兼容性。对应项目在 [系统验收](system-acceptance.md) 中保持独立状态。当前查询返回完整数组，尚无服务端分页；现有测试不提供生产规模的容量或负载结论。
+自动化证明后端业务、权限和结构化接口链路。真实摄像头和 DeepSeek 的已有独立实验、新环境设备复测以及跨设备 IP 访问分别记录；具体边界见 [系统验收](system-acceptance.md)。当前查询返回完整数组，尚无服务端分页；现有测试不提供生产规模的容量或负载结论。

@@ -65,6 +65,19 @@ def parsed(response):
     return list(csv.DictReader(io.StringIO(response.content.decode("utf-8-sig"), newline="")))
 
 
+def test_sql_injection_filters_remain_literal_and_leave_records_unchanged(dataset):
+    injected = "' OR 1=1; DROP TABLE emoji_record; --"
+    assert get(dataset, "/api/emoji/history", **{"class": injected}).json()["data"] == []
+    for path in PATHS[:2]:
+        assert get(dataset, path, **{"class": injected, "source": "ALL"}).json()["data"]["total"] == 0
+    assert parsed(get(dataset, PATHS[2], **{"class": injected})) == []
+    for field in ("course", "sessionId", "userId"):
+        assert get(dataset, PATHS[1], **{field: injected}).status_code == 422
+    assert get(dataset, PATHS[1], source="ALL").json()["data"]["total"] == 5
+    with dataset["factory"]() as session:
+        assert session.scalar(select(func.count()).select_from(EmojiRecord)) == 6
+
+
 def test_default_manual_and_explicit_source_match_across_endpoints(dataset):
     for source, total in ((None, 4), ("MANUAL", 4), ("AI", 1), ("ALL", 5)):
         filters = {} if source is None else {"source": source}

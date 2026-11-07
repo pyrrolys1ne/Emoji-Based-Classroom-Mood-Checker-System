@@ -1,14 +1,14 @@
 # 客户端与跨端验证
 
-客户端 API 模式已接通正式后端，覆盖账号、教师审批、课堂范围、手动反馈、历史、密码和注销。API 模式不回退到演示数据；演示仓储仅用于独立页面体验。当前接口见 [API 契约](api-contract.md)，可重复的真实链路见 [系统验收](system-acceptance.md)。
+客户端 API 模式已接通正式后端，覆盖账号、教师审批、课堂范围、手动反馈、历史、密码和注销。API 模式不回退到演示数据；演示仓储仅用于独立页面体验。当前完整验证结果见 [项目验证报告](project-verification.md)，接收环境测试与录制见 [交接说明](handover.md)。当前接口见 [API 契约](api-contract.md)，可重复的真实链路见 [系统验收](system-acceptance.md)。
 
 ## 验证范围
 
 | 检查                                 | 覆盖                                                                                    |
 | ------------------------------------ | --------------------------------------------------------------------------------------- |
 | `npm run typecheck`、`npm run build` | 客户端、管理端、共享契约及两个生产构建                                                  |
-| `npm run test:client`                | 65 项：API / 演示仓储、状态、组件、幂等重试、无效回执、迟到响应与会话恢复               |
-| `npm run test:admin`                 | 36 项：统计、CSV、AI 状态竞态、实时连接与 URL 配置边界                                  |
+| `npm run test:client`                | 67 项：API / 演示仓储、状态、组件、幂等重试、无效回执、迟到响应与会话恢复               |
+| `npm run test:admin`                 | 66 项：统计、CSV、AI 状态竞态、实时连接与 URL 配置边界                                  |
 | 客户端 Playwright                    | Chromium、Firefox、手机视口、受控 HTTP、无障碍与异常状态；该组使用演示或受控响应        |
 | 正式后端 pytest                      | PostgreSQL 迁移、账号、课堂、权限、提交时段、审计、AI 回执、统计 / CSV 与跨进程实时连接 |
 | `npm run test:system`                | 生产构建 + 真实后端 + PostgreSQL + 独立 AI 服务的全链路，使用合成账号与隔离模拟输入     |
@@ -19,4 +19,4 @@
 
 ## 结论边界
 
-本地进程模式的真实链路通过。容器 Nginx 与备份恢复由 CI 的 `container-acceptance` 单独验证，具体提交结果以 Actions 为准；本地没有 Docker Engine，不能认定本地容器部署通过。完整命令、运行产物和未执行的真实模型、摄像头、远程推理、目标主机与真机验证见 [系统验收](system-acceptance.md)。手机视口和模拟 AI 不作为真实设备与模型效果依据。
+本地进程模式的真实链路通过。容器 Nginx 与备份恢复由 CI 的 `container-acceptance` 单独验证，具体提交结果以 Actions 为准；本地没有 Docker Engine，不能认定本地容器部署通过。完整命令、运行产物以及真实模型、摄像头、远程推理与新环境的独立验证边界见 [系统验收](system-acceptance.md)。手机视口和模拟 AI 不作为真实设备与模型效果依据。

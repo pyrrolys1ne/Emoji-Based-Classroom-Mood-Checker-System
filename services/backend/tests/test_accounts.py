@@ -101,6 +101,21 @@ def test_duplicate_registration_is_atomic_and_has_specific_errors(auth):
         assert session.scalar(select(func.count()).select_from(AuditLog)) == 1
 
 
+def test_login_sql_injection_cannot_bypass_authentication_or_modify_users(auth):
+    client, factory, _ = auth
+    _, admin_headers = administrator(client)
+    for username, password in (
+        ("admin' OR '1'='1", PASSWORD),
+        ("'; DROP TABLE app_user; --", PASSWORD),
+        ("admin", "wrong' OR '1'='1"),
+    ):
+        response = login(client, username, password)
+        assert response.status_code == 401 and response.json()["data"] is None
+    assert client.get("/api/admin/users", headers=admin_headers).status_code == 200
+    with factory() as session:
+        assert session.scalar(select(func.count()).select_from(AppUser)) == 1
+
+
 def test_wrong_credentials_and_malformed_or_wrong_namespace_tokens(auth):
     client, _, _ = auth
     register(client)

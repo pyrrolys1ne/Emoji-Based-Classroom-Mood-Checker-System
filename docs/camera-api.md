@@ -4,12 +4,14 @@
 
 ## 安装与启动
 
+按 [本地部署](local-deployment.md) 启动正式后端、PostgreSQL 和 API 模式的两个 Web 端，并在已配置服务端令牌的 AI 环境安装摄像头依赖。已有 AI 进程时安装后正常重启，不重复占用同一端口：
+
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -r services/ai/requirements-camera.txt
-npm run dev:integration
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --app-dir services/ai --host 127.0.0.1 --port 8001 --no-access-log
 ```
 
-在 `services/ai/.env` 配置 `DEEPSEEK_API_KEY`。该模式需要 OpenCV 和基础 AI 依赖，不需要 DeepFace、TensorFlow 或本地模型权重。若 AI 端口冲突，可在启动前设置 `MOOD_AI_PORT`。
+在 `services/ai/.env` 配置 `DEEPSEEK_API_KEY`。该模式需要 OpenCV 和基础 AI 依赖，不需要 DeepFace、TensorFlow 或本地模型权重。修改原生进程 AI 端口时，同时调整 `--port` 与后端 `MOOD_AI_BASE_URL`；`MOOD_AI_PORT` 由 Compose 或独立联调启动脚本读取，不能代替原生 uvicorn 的端口参数。
 
 管理员登录管理端，在“AI 集成”选择关联课堂与“本机摄像头 + DeepSeek API”，填写设备编号，勾选将采样帧发送至 DeepSeek，再启动采集。设备编号通常从 0 开始；设备顺序由系统和驱动决定。教师没有启停权限。
 
