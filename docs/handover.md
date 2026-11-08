@@ -167,7 +167,7 @@ npm run test:system
 
 ```powershell
 $env:PLAYWRIGHT_BROWSERS_PATH = Join-Path (Get-Location) '.local/browsers'
-npx playwright install chromium firefox
+npx playwright install chromium
 npm run test:e2e --workspace @mood/client
 npm run test:system
 ```

@@ -9,7 +9,7 @@
 | `npm run typecheck`、`npm run build` | 客户端、管理端、共享契约及两个生产构建                                                  |
 | `npm run test:client`                | 67 项：API / 演示仓储、状态、组件、幂等重试、无效回执、迟到响应与会话恢复               |
 | `npm run test:admin`                 | 66 项：统计、CSV、AI 状态竞态、实时连接与 URL 配置边界                                  |
-| 客户端 Playwright                    | Chromium、Firefox、手机视口、受控 HTTP、无障碍与异常状态；该组使用演示或受控响应        |
+| 客户端 Playwright                    | Chromium、手机视口、受控 HTTP、无障碍与异常状态；该组使用演示或受控响应                 |
 | 正式后端 pytest                      | PostgreSQL 迁移、账号、课堂、权限、提交时段、审计、AI 回执、统计 / CSV 与跨进程实时连接 |
 | `npm run test:system`                | 生产构建 + 真实后端 + PostgreSQL + 独立 AI 服务的全链路，使用合成账号与隔离模拟输入     |
 

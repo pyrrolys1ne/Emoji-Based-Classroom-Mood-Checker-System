@@ -30,11 +30,6 @@ export default defineConfig({
       },
     },
     {
-      name: 'firefox',
-      testIgnore: '**/api.spec.ts',
-      use: { browserName: 'firefox', viewport: { width: 1440, height: 900 } },
-    },
-    {
       name: 'mobile',
       testIgnore: '**/api.spec.ts',
       use: {

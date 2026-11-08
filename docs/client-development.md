@@ -66,13 +66,13 @@ npm run build
 
 ```powershell
 $env:PLAYWRIGHT_BROWSERS_PATH = Join-Path (Get-Location) '.local/browsers'
-npm exec -- playwright install chromium firefox
+npm exec -- playwright install chromium
 npm run test:e2e --workspace @mood/client
 ```
 
-macOS／Linux 可用 `PLAYWRIGHT_BROWSERS_PATH="$PWD/.local/browsers" npm exec -- playwright install chromium firefox`。配置默认使用仓库 .local/browsers，不修改用户已有浏览器配置。
+macOS／Linux 可用 `PLAYWRIGHT_BROWSERS_PATH="$PWD/.local/browsers" npm exec -- playwright install chromium`。配置默认使用仓库 .local/browsers，不修改用户已有浏览器配置。
 
-本地下载受限时，可设置 `PLAYWRIGHT_CHROMIUM_CHANNEL=msedge` 或 chrome，使用已安装浏览器的独立测试实例；Firefox 项目仍需要相应的 Playwright 浏览器。CI 安装指定版本的 Chromium 和 Firefox。测试服务器占用 5184（演示）和 5185（API），不复用正在运行的同端口服务。
+本地下载受限时，可设置 `PLAYWRIGHT_CHROMIUM_CHANNEL=msedge` 或 chrome，使用已安装浏览器的独立测试实例。CI 安装指定版本的 Chromium。测试服务器占用 5184（演示）和 5185（API），不复用正在运行的同端口服务。
 
 ```powershell
 $env:PLAYWRIGHT_CHROMIUM_CHANNEL = 'msedge'
