@@ -1,0 +1,55 @@
+{
+  "dataset": "gabriellidenor/facial_expression_seven_classes (FER2013 test split)",
+  "classes": [
+    "happy",
+    "sad",
+    "angry",
+    "neutral"
+  ],
+  "per_class": 10,
+  "total": 40,
+  "agreement": 28,
+  "agreement_rate": 0.7,
+  "no_face": 0,
+  "errors": 0,
+  "avg_latency_ms": 997,
+  "upscale": 4,
+  "by_class": {
+    "happy": {
+      "total": 10,
+      "agreement": 9,
+      "predicted": [
+        "happy",
+        "neutral"
+      ]
+    },
+    "sad": {
+      "total": 10,
+      "agreement": 4,
+      "predicted": [
+        "angry",
+        "neutral",
+        "sad",
+        "surprise"
+      ]
+    },
+    "angry": {
+      "total": 10,
+      "agreement": 5,
+      "predicted": [
+        "angry",
+        "neutral",
+        "sad",
+        "surprise",
+        "uncertain"
+      ]
+    },
+    "neutral": {
+      "total": 10,
+      "agreement": 10,
+      "predicted": [
+        "neutral"
+      ]
+    }
+  }
+}
